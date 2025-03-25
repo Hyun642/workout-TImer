@@ -1,0 +1,20 @@
+
+{
+  "dependencies": {
+    "react-native": "latest",
+    "react-native-safe-area-context": "latest",
+    "expo-linear-gradient": "latest",
+    "lucide-react-native": "latest",
+    "react-native-gesture-handler": "latest",
+    "@react-native-community/slider": "latest",
+    "expo-camera": "latest",
+    "@react-navigation/native": "latest",
+    "@react-navigation/native-stack": "latest",
+    "@react-navigation/bottom-tabs": "latest",
+    "react-native-svg": "latest",
+    "@react-native-async-storage/async-storage": "latest",
+    "@supabase/supabase-js": "latest",
+    "sonner-native": "latest",
+    "react-native-screens": "latest"
+  }
+}
