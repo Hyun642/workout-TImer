@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { Audio } from "expo-av";
 
 interface TimerProps {
      duration: number;
@@ -11,16 +12,53 @@ interface TimerProps {
 
 export default function Timer({ duration, isActive, onComplete, prepTime, preStartTime }: TimerProps) {
      const [timeLeft, setTimeLeft] = useState(duration);
-     const [isPreparing, setIsPreparing] = useState(false);
+     const [isPreparing, setIsPreparing] = useState(true);
      const [prepTimeLeft, setPrepTimeLeft] = useState(preStartTime);
-     const progressAnim = useRef(new Animated.Value(1)).current;
+     const [shouldComplete, setShouldComplete] = useState(false);
+     const [setEndSound, setSetEndSound] = useState<Audio.Sound | null>(null);
+     const [restEndSound, setRestEndSound] = useState<Audio.Sound | null>(null);
+
+     useEffect(() => {
+          const loadSounds = async () => {
+               try {
+                    await Audio.setAudioModeAsync({
+                         allowsRecordingIOS: false,
+                         playsInSilentModeIOS: true,
+                         staysActiveInBackground: false,
+                         shouldDuckAndroid: false,
+                    });
+
+                    const { sound: setEnd } = await Audio.Sound.createAsync(require("../assets/set_end.mp3"), {
+                         shouldPlay: false,
+                    });
+                    const { sound: restEnd } = await Audio.Sound.createAsync(require("../assets/rest_end.mp3"), {
+                         shouldPlay: false,
+                    });
+                    setSetEndSound(setEnd);
+                    setRestEndSound(restEnd);
+                    console.log("Timer sounds loaded: set_end and rest_end");
+               } catch (error) {
+                    console.error("Error loading Timer sounds:", error);
+               }
+          };
+          loadSounds();
+
+          return () => {
+               if (setEndSound) {
+                    setEndSound.unloadAsync().catch((error) => console.error("Error unloading setEndSound:", error));
+               }
+               if (restEndSound) {
+                    restEndSound.unloadAsync().catch((error) => console.error("Error unloading restEndSound:", error));
+               }
+          };
+     }, []);
 
      useEffect(() => {
           if (!isActive) {
                setTimeLeft(duration);
                setPrepTimeLeft(preStartTime);
                setIsPreparing(true);
-               progressAnim.setValue(1);
+               setShouldComplete(false);
                return;
           }
 
@@ -31,27 +69,19 @@ export default function Timer({ duration, isActive, onComplete, prepTime, preSta
                     setPrepTimeLeft((prev) => {
                          if (prev <= 1) {
                               setIsPreparing(false);
-                              progressAnim.setValue(1);
+                              if (restEndSound) {
+                                   restEndSound.replayAsync().then(() => console.log("Rest end sound played"));
+                              }
                               return preStartTime;
                          }
                          return prev - 1;
                     });
                }, 1000);
           } else if (!isPreparing && timeLeft > 0) {
-               Animated.timing(progressAnim, {
-                    toValue: 0,
-                    duration: timeLeft * 1000,
-                    useNativeDriver: false,
-               }).start();
-
                interval = setInterval(() => {
                     setTimeLeft((prev) => {
                          if (prev <= 1) {
-                              clearInterval(interval);
-                              onComplete();
-                              setIsPreparing(true);
-                              progressAnim.setValue(1);
-                              setPrepTimeLeft(prepTime);
+                              setShouldComplete(true);
                               return duration;
                          }
                          return prev - 1;
@@ -59,19 +89,28 @@ export default function Timer({ duration, isActive, onComplete, prepTime, preSta
                }, 1000);
           }
 
-          return () => clearInterval(interval);
-     }, [isActive, isPreparing, duration, prepTime, preStartTime]);
+          return () => {
+               if (interval) clearInterval(interval);
+          };
+     }, [isActive, isPreparing, timeLeft, prepTimeLeft, duration, preStartTime, restEndSound]);
+
+     useEffect(() => {
+          if (shouldComplete) {
+               onComplete();
+               setShouldComplete(false);
+               setIsPreparing(true);
+               setPrepTimeLeft(prepTime);
+               if (setEndSound) {
+                    setEndSound.replayAsync().then(() => console.log("Set end sound played"));
+               }
+          }
+     }, [shouldComplete, onComplete, prepTime, setEndSound]);
 
      const formatTime = (seconds: number) => {
           const mins = Math.floor(seconds / 60);
           const secs = seconds % 60;
           return `${mins}:${secs.toString().padStart(2, "0")}`;
      };
-
-     const progressWidth = progressAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: ["0%", "100%"],
-     });
 
      return (
           <View style={styles.container}>
@@ -88,17 +127,6 @@ export default function Timer({ duration, isActive, onComplete, prepTime, preSta
                          </View>
                     )}
                </View>
-               {isActive && (
-                    <View style={styles.progressContainer}>
-                         <Animated.View
-                              style={[
-                                   styles.progressBar,
-                                   { width: progressWidth },
-                                   { backgroundColor: isPreparing ? "#FFA500" : "#FF1744" },
-                              ]}
-                         />
-                    </View>
-               )}
           </View>
      );
 }
@@ -145,17 +173,5 @@ const styles = StyleSheet.create({
           color: "#FFFFFF",
           marginVertical: 8,
           fontVariant: ["tabular-nums"],
-     },
-     progressContainer: {
-          width: "100%",
-          height: 6,
-          backgroundColor: "#333",
-          borderRadius: 3,
-          overflow: "hidden",
-          marginTop: 8,
-     },
-     progressBar: {
-          height: "100%",
-          backgroundColor: "#4CAF50",
      },
 });

@@ -22,6 +22,7 @@ interface Props {
 export default function HomeScreen({ navigation }: Props) {
      const [workouts, setWorkouts] = useState<Workout[]>([]);
      const [isModalVisible, setIsModalVisible] = useState(false);
+     const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
 
      useEffect(() => {
           loadWorkouts();
@@ -54,11 +55,27 @@ export default function HomeScreen({ navigation }: Props) {
      };
 
      const handleDeleteWorkout = (id: string) => {
-          setWorkouts(workouts.filter((workout) => workout.id !== id));
+          const newWorkouts = workouts.filter((workout) => workout.id !== id);
+          setWorkouts(newWorkouts);
+          saveWorkouts(newWorkouts);
      };
 
      const handleEditWorkout = (updatedWorkout: Workout) => {
-          setWorkouts(workouts.map((workout) => (workout.id === updatedWorkout.id ? updatedWorkout : workout)));
+          const newWorkouts = workouts.map((workout) => (workout.id === updatedWorkout.id ? updatedWorkout : workout));
+          setWorkouts(newWorkouts);
+          saveWorkouts(newWorkouts);
+          setIsModalVisible(false);
+          setEditingWorkout(null);
+     };
+
+     const openEditModal = (workout: Workout) => {
+          setEditingWorkout(workout);
+          setIsModalVisible(true);
+     };
+
+     const closeModal = () => {
+          setIsModalVisible(false);
+          setEditingWorkout(null);
      };
 
      const goToHistory = () => {
@@ -86,7 +103,7 @@ export default function HomeScreen({ navigation }: Props) {
                     <FlatList
                          data={workouts}
                          renderItem={({ item }) => (
-                              <WorkoutCard workout={item} onDelete={handleDeleteWorkout} onEdit={handleEditWorkout} />
+                              <WorkoutCard workout={item} onDelete={handleDeleteWorkout} onEdit={openEditModal} />
                          )}
                          keyExtractor={(item) => item.id}
                          contentContainerStyle={styles.listContent}
@@ -96,8 +113,9 @@ export default function HomeScreen({ navigation }: Props) {
                <AddWorkoutButton onPress={() => setIsModalVisible(true)} />
                <AddWorkoutModal
                     visible={isModalVisible}
-                    onClose={() => setIsModalVisible(false)}
-                    onSubmit={handleAddWorkout}
+                    onClose={closeModal}
+                    onSubmit={editingWorkout ? handleEditWorkout : handleAddWorkout}
+                    initialWorkout={editingWorkout}
                />
           </SafeAreaView>
      );

@@ -26,6 +26,16 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
      const [shakeAnimation] = useState(new Animated.Value(0));
      const [shakeNameAnimation] = useState(new Animated.Value(0));
 
+     React.useEffect(() => {
+          if (initialWorkout) {
+               setName(initialWorkout.name);
+               setDuration(initialWorkout.duration.toString());
+               setRepeatCount(initialWorkout.repeatCount.toString());
+               setPrepTime(initialWorkout.prepTime.toString());
+               setPreStartTime(initialWorkout.preStartTime.toString());
+          }
+     }, [initialWorkout]);
+
      const shake = () => {
           Animated.sequence([
                Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
@@ -53,19 +63,24 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
                return;
           }
 
-          onSubmit({
-               id: "",
+          const workoutData: Workout = {
+               id: initialWorkout?.id || "",
                name,
                duration: parseInt(duration, 10),
                repeatCount: parseInt(repeatCount, 10) || 0,
                prepTime: parseInt(prepTime, 10) || 5,
                preStartTime: parseInt(preStartTime, 10) || 3,
-          });
+          };
 
-          setName("");
-          setDuration("");
-          setRepeatCount("");
-          setPrepTime("");
+          onSubmit(workoutData);
+
+          if (!initialWorkout) {
+               setName("");
+               setDuration("");
+               setRepeatCount("");
+               setPrepTime("");
+               setPreStartTime("3");
+          }
      };
 
      return (
@@ -75,7 +90,7 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
                          <Animated.View style={{ transform: [{ translateX: shakeNameAnimation }] }}>
                               <TextInput
                                    style={styles.title}
-                                   placeholder="루틴 이름"
+                                   placeholder={initialWorkout ? "루틴 이름 수정" : "루틴 이름"}
                                    value={name}
                                    onChangeText={setName}
                               />
@@ -130,7 +145,9 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
                                    <Text style={styles.buttonText}>취소</Text>
                               </Pressable>
                               <Pressable style={[styles.button, styles.submitButton]} onPress={handleSubmit}>
-                                   <Text style={[styles.buttonText, styles.submitButtonText]}>추가</Text>
+                                   <Text style={[styles.buttonText, styles.submitButtonText]}>
+                                        {initialWorkout ? "수정" : "추가"}
+                                   </Text>
                               </Pressable>
                          </View>
                     </View>

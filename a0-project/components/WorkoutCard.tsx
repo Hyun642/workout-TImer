@@ -1,11 +1,13 @@
-import React, { useState, useRef } from "react";
-import { View, Text, StyleSheet, Pressable, Animated, Alert } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, Pressable, Alert, Switch } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Timer from "./Timer";
 import { Workout } from "../types/workout";
 import { WorkoutHistory } from "../types/history";
-import AddWorkoutModal from "./AddWorkoutModal";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { v4 as uuidv4 } from "uuid";
+import { Audio } from "expo-av";
 
 interface WorkoutCardProps {
      workout: Workout;
@@ -27,57 +29,127 @@ const saveWorkoutHistory = async (historyItem: WorkoutHistory) => {
 export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardProps) {
      const [isTimerActive, setIsTimerActive] = useState(false);
      const [repeatCount, setRepeatCount] = useState(0);
-     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
      const [isPaused, setIsPaused] = useState(false);
      const [isCompleted, setIsCompleted] = useState(false);
      const [startTime, setStartTime] = useState<Date | null>(null);
      const [totalTime, setTotalTime] = useState<number>(0);
-     const scaleAnim = new Animated.Value(1);
-     const completedAnim = useRef(new Animated.Value(0)).current;
+     const [workoutEndSound, setWorkoutEndSound] = useState<Audio.Sound | null>(null);
+     const [backgroundMusic, setBackgroundMusic] = useState<Audio.Sound | null>(null);
+     const [isMusicEnabled, setIsMusicEnabled] = useState(false);
+     const [selectedTrack, setSelectedTrack] = useState("music1");
+
+     const musicTracks = {
+          music1: require("../assets/music1.mp3"),
+          music2: require("../assets/music2.mp3"),
+          music3: require("../assets/music3.mp3"),
+     };
+
+     useEffect(() => {
+          const initializeSounds = async () => {
+               try {
+                    await Audio.setAudioModeAsync({
+                         allowsRecordingIOS: false,
+                         playsInSilentModeIOS: true,
+                         staysActiveInBackground: false,
+                         shouldDuckAndroid: false,
+                    });
+
+                    const { sound: endSound } = await Audio.Sound.createAsync(require("../assets/workout_end.mp3"), {
+                         shouldPlay: false,
+                    });
+                    await endSound.setVolumeAsync(1.0);
+                    setWorkoutEndSound(endSound);
+                    console.log("Workout end sound loaded successfully with volume 1.0");
+               } catch (error) {
+                    console.error("Failed to load workout end sound:", error);
+               }
+          };
+          initializeSounds();
+
+          return () => {
+               if (workoutEndSound) workoutEndSound.unloadAsync();
+               if (backgroundMusic) backgroundMusic.unloadAsync();
+          };
+     }, []);
+
+     useEffect(() => {
+          const loadBackgroundMusic = async () => {
+               if (backgroundMusic) {
+                    await backgroundMusic.unloadAsync();
+                    console.log(`Unloaded previous ${selectedTrack}`);
+               }
+               try {
+                    const { sound } = await Audio.Sound.createAsync(musicTracks[selectedTrack], {
+                         shouldPlay: false,
+                    });
+                    await sound.setVolumeAsync(0.7);
+                    setBackgroundMusic(sound);
+                    console.log(`Background music ${selectedTrack} loaded successfully with volume 0.7`);
+               } catch (error) {
+                    console.error(`Failed to load background music ${selectedTrack}:`, error);
+               }
+          };
+          loadBackgroundMusic();
+     }, [selectedTrack]);
+
+     useEffect(() => {
+          const controlMusic = async () => {
+               if (!backgroundMusic) {
+                    console.warn(`Background music ${selectedTrack} not initialized yet`);
+                    return;
+               }
+               console.log(
+                    `ControlMusic: isMusicEnabled=${isMusicEnabled}, isTimerActive=${isTimerActive}, isPaused=${isPaused}`
+               );
+               try {
+                    if (isMusicEnabled && isTimerActive && !isPaused) {
+                         await backgroundMusic.setIsLoopingAsync(true);
+                         await backgroundMusic.playAsync();
+                         console.log(`Playing ${selectedTrack}`);
+                    } else if (backgroundMusic) {
+                         await backgroundMusic.pauseAsync();
+                         console.log(`Paused ${selectedTrack}`);
+                    }
+               } catch (error) {
+                    console.error(`Error controlling background music ${selectedTrack}:`, error);
+               }
+          };
+          controlMusic();
+     }, [isTimerActive, isPaused, isMusicEnabled, backgroundMusic]);
+
+     const playWorkoutEndSound = async () => {
+          try {
+               if (workoutEndSound) {
+                    await workoutEndSound.setVolumeAsync(1.0);
+                    await workoutEndSound.replayAsync();
+                    console.log("Workout end sound played with volume 1.0");
+               }
+          } catch (error) {
+               console.error("Error playing workout end sound:", error);
+          }
+     };
 
      const handlePress = () => {
           if (!isTimerActive && !isCompleted) {
                setStartTime(new Date());
-          }
-          Animated.sequence([
-               Animated.timing(scaleAnim, {
-                    toValue: 0.95,
-                    duration: 100,
-                    useNativeDriver: true,
-               }),
-               Animated.timing(scaleAnim, {
-                    toValue: 1,
-                    duration: 100,
-                    useNativeDriver: true,
-               }),
-          ]).start();
-
-          if (isCompleted) {
+               setIsTimerActive(true);
+               setIsPaused(false);
+               console.log("Timer started");
+          } else if (isCompleted) {
                handleReset();
-               return;
+          } else if (isTimerActive && !isPaused) {
+               setIsPaused(true);
+               console.log("Timer paused");
+          } else if (isTimerActive && isPaused) {
+               setIsPaused(false);
+               console.log("Timer resumed");
           }
-
-          if (isTimerActive && !isPaused && startTime) {
-               const historyItem: WorkoutHistory = {
-                    id: new Date().toISOString() + Math.random().toString(),
-                    workoutId: workout.id,
-                    workoutName: workout.name,
-                    startTime: startTime.toISOString(),
-                    endTime: new Date().toISOString(),
-                    totalRepetitions: repeatCount,
-                    completed: false,
-               };
-               saveWorkoutHistory(historyItem);
-          }
-
-          setIsTimerActive(!isTimerActive);
-          setIsPaused(!isPaused);
      };
 
      const handleReset = () => {
           if (startTime && (isTimerActive || isPaused)) {
                const historyItem: WorkoutHistory = {
-                    id: new Date().toISOString() + Math.random().toString(),
+                    id: uuidv4(),
                     workoutId: workout.id,
                     workoutName: workout.name,
                     startTime: startTime.toISOString(),
@@ -94,19 +166,18 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           setIsCompleted(false);
           setStartTime(null);
           setTotalTime(0);
-          completedAnim.setValue(0);
+          console.log("Timer reset");
      };
 
      const celebrateCompletion = () => {
           setIsCompleted(true);
-          let endTime: Date;
           if (startTime) {
-               endTime = new Date();
+               const endTime = new Date();
                const timeDiff = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
                setTotalTime(timeDiff);
 
                const historyItem: WorkoutHistory = {
-                    id: new Date().toISOString() + Math.random().toString(),
+                    id: uuidv4(),
                     workoutId: workout.id,
                     workoutName: workout.name,
                     startTime: startTime.toISOString(),
@@ -115,20 +186,8 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     completed: true,
                };
                saveWorkoutHistory(historyItem);
+               playWorkoutEndSound();
           }
-
-          Animated.sequence([
-               Animated.timing(completedAnim, {
-                    toValue: 1,
-                    duration: 500,
-                    useNativeDriver: true,
-               }),
-               Animated.spring(completedAnim, {
-                    toValue: 0.8,
-                    friction: 3,
-                    useNativeDriver: true,
-               }),
-          ]).start();
      };
 
      const handleComplete = () => {
@@ -136,31 +195,31 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                const newCount = prev + 1;
                if (workout.repeatCount !== 0 && newCount >= workout.repeatCount) {
                     setIsTimerActive(false);
+                    setIsPaused(false);
                     celebrateCompletion();
                     return newCount;
                }
                if (workout.repeatCount === 0 || newCount < workout.repeatCount) {
                     setIsTimerActive(true);
+                    setIsPaused(false);
                }
                return newCount;
           });
      };
 
      return (
-          <Animated.View
-               style={[
-                    styles.card,
-                    { transform: [{ scale: scaleAnim }] },
-                    isTimerActive && !isPaused && !isCompleted && { backgroundColor: "#4CAF50" },
-                    isPaused && { backgroundColor: "#4CAF50" },
-                    isCompleted && { backgroundColor: "#2196F3" },
-               ]}
-          >
-               <Pressable onPress={handlePress}>
+          <View style={styles.card}>
+               <Pressable onPress={handlePress} style={styles.pressableArea}>
                     <View style={styles.header}>
                          <Text style={styles.title}>{workout.name}</Text>
                          <View style={styles.actions}>
-                              <Pressable onPress={() => setIsEditModalVisible(true)} style={styles.actionButton}>
+                              <Pressable
+                                   onPress={() => {
+                                        console.log("Editing workout:", workout);
+                                        onEdit(workout);
+                                   }}
+                                   style={styles.actionButton}
+                              >
                                    <MaterialCommunityIcons name="pencil" size={24} color="#666" />
                               </Pressable>
                               <Pressable
@@ -203,76 +262,43 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     )}
 
                     {isCompleted && (
-                         <Animated.View
-                              style={[
-                                   styles.completedOverlay,
-                                   {
-                                        transform: [
-                                             { scale: completedAnim },
-                                             {
-                                                  translateY: completedAnim.interpolate({
-                                                       inputRange: [0, 1],
-                                                       outputRange: [50, 0],
-                                                  }),
-                                             },
-                                        ],
-                                        opacity: completedAnim,
-                                   },
-                              ]}
-                         >
+                         <View style={styles.completedOverlay}>
                               <Text style={styles.completedText}>대단해요!</Text>
                               <MaterialIcons name="celebration" size={40} color="#FFD700" />
                               <Text style={styles.totalTimeText}>
                                    총 소요시간: {Math.floor(totalTime / 60)}분 {totalTime % 60}초
                               </Text>
-                         </Animated.View>
+                         </View>
                     )}
                </Pressable>
 
-               <AddWorkoutModal
-                    visible={isEditModalVisible}
-                    onClose={() => setIsEditModalVisible(false)}
-                    onSubmit={(updatedWorkout) => {
-                         onEdit({ ...updatedWorkout, id: workout.id });
-                         setIsEditModalVisible(false);
-                    }}
-                    initialWorkout={workout}
-               />
-          </Animated.View>
+               {/* 음악 제어 UI */}
+               <View style={styles.musicControl}>
+                    <View style={styles.switchContainer}>
+                         <Text style={styles.musicLabel}>배경 음악</Text>
+                         <Switch
+                              value={isMusicEnabled}
+                              onValueChange={(value) => setIsMusicEnabled(value)}
+                              trackColor={{ false: "#767577", true: "#81b0ff" }}
+                              thumbColor={isMusicEnabled ? "#f5dd4b" : "#f4f3f4"}
+                         />
+                    </View>
+                    <Picker
+                         selectedValue={selectedTrack}
+                         onValueChange={(itemValue: any) => setSelectedTrack(itemValue)}
+                         style={styles.picker}
+                         enabled={isMusicEnabled}
+                    >
+                         <Picker.Item label="Music 1" value="music1" />
+                         <Picker.Item label="Music 2" value="music2" />
+                         <Picker.Item label="Music 3" value="music3" />
+                    </Picker>
+               </View>
+          </View>
      );
 }
 
 const styles = StyleSheet.create({
-     pauseOverlay: {
-          ...StyleSheet.absoluteFillObject,
-          backgroundColor: "rgba(150, 230, 170, 0.1)",
-          justifyContent: "center",
-          alignItems: "center",
-          borderRadius: 16,
-     },
-     pauseText: {
-          fontSize: 32,
-          fontWeight: "bold",
-          color: "#FFFFFF",
-     },
-     completedOverlay: {
-          ...StyleSheet.absoluteFillObject,
-          backgroundColor: "rgba(33, 150, 243, 0.9)",
-          justifyContent: "center",
-          alignItems: "center",
-          borderRadius: 16,
-     },
-     completedText: {
-          fontSize: 36,
-          fontWeight: "bold",
-          color: "#FFFFFF",
-          marginBottom: 16,
-     },
-     resetButton: {
-          padding: 8,
-          backgroundColor: "rgba(255, 255, 255, 0.2)",
-          borderRadius: 20,
-     },
      card: {
           backgroundColor: "#2196F3",
           borderRadius: 16,
@@ -283,10 +309,10 @@ const styles = StyleSheet.create({
           shadowOpacity: 0.3,
           shadowRadius: 8,
           elevation: 5,
-          aspectRatio: 1,
           width: "100%",
-          borderWidth: 1,
-          borderColor: "#333",
+     },
+     pressableArea: {
+          flex: 1,
      },
      header: {
           flexDirection: "row",
@@ -316,5 +342,60 @@ const styles = StyleSheet.create({
           fontSize: 16,
           color: "#BBBBBB",
           fontWeight: "500",
+     },
+     resetButton: {
+          padding: 8,
+          backgroundColor: "rgba(255, 255, 255, 0.2)",
+          borderRadius: 20,
+     },
+     pauseOverlay: {
+          ...StyleSheet.absoluteFillObject,
+          backgroundColor: "rgba(150, 230, 170, 0.1)",
+          justifyContent: "center",
+          alignItems: "center",
+          borderRadius: 16,
+     },
+     pauseText: {
+          fontSize: 32,
+          fontWeight: "bold",
+          color: "#FFFFFF",
+     },
+     completedOverlay: {
+          ...StyleSheet.absoluteFillObject,
+          backgroundColor: "rgba(33, 150, 243, 0.9)",
+          justifyContent: "center",
+          alignItems: "center",
+          borderRadius: 16,
+     },
+     completedText: {
+          fontSize: 36,
+          fontWeight: "bold",
+          color: "#FFFFFF",
+          marginBottom: 16,
+     },
+     totalTimeText: {
+          fontSize: 16,
+          color: "#FFFFFF",
+     },
+     musicControl: {
+          marginTop: 16,
+          padding: 10,
+          backgroundColor: "rgba(255, 255, 255, 0.1)",
+          borderRadius: 8,
+          width: "100%",
+     },
+     switchContainer: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+     },
+     musicLabel: {
+          fontSize: 16,
+          color: "#FFFFFF",
+     },
+     picker: {
+          width: "100%",
+          color: "#FFFFFF",
+          marginTop: 8,
      },
 });
