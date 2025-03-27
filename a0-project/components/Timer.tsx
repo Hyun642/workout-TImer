@@ -5,12 +5,20 @@ import { Audio } from "expo-av";
 interface TimerProps {
      duration: number;
      isActive: boolean;
+     isPaused?: boolean;
      onComplete: () => void;
      prepTime: number;
      preStartTime: number;
 }
 
-export default function Timer({ duration, isActive, onComplete, prepTime, preStartTime }: TimerProps) {
+export default function Timer({
+     duration,
+     isActive,
+     isPaused = false,
+     onComplete,
+     prepTime,
+     preStartTime,
+}: TimerProps) {
      const [timeLeft, setTimeLeft] = useState(duration);
      const [isPreparing, setIsPreparing] = useState(true);
      const [prepTimeLeft, setPrepTimeLeft] = useState(preStartTime);
@@ -64,35 +72,37 @@ export default function Timer({ duration, isActive, onComplete, prepTime, preSta
 
           let interval: NodeJS.Timeout;
 
-          if (isPreparing && prepTimeLeft > 0) {
-               interval = setInterval(() => {
-                    setPrepTimeLeft((prev) => {
-                         if (prev <= 1) {
-                              setIsPreparing(false);
-                              if (restEndSound) {
-                                   restEndSound.replayAsync().then(() => console.log("Rest end sound played"));
+          if (isActive && !isPaused) {
+               if (isPreparing && prepTimeLeft > 0) {
+                    interval = setInterval(() => {
+                         setPrepTimeLeft((prev) => {
+                              if (prev <= 1) {
+                                   setIsPreparing(false);
+                                   if (restEndSound) {
+                                        restEndSound.replayAsync().then(() => console.log("Rest end sound played"));
+                                   }
+                                   return preStartTime;
                               }
-                              return preStartTime;
-                         }
-                         return prev - 1;
-                    });
-               }, 1000);
-          } else if (!isPreparing && timeLeft > 0) {
-               interval = setInterval(() => {
-                    setTimeLeft((prev) => {
-                         if (prev <= 1) {
-                              setShouldComplete(true);
-                              return duration;
-                         }
-                         return prev - 1;
-                    });
-               }, 1000);
+                              return prev - 1;
+                         });
+                    }, 1000);
+               } else if (!isPreparing && timeLeft > 0) {
+                    interval = setInterval(() => {
+                         setTimeLeft((prev) => {
+                              if (prev <= 1) {
+                                   setShouldComplete(true);
+                                   return duration;
+                              }
+                              return prev - 1;
+                         });
+                    }, 1000);
+               }
           }
 
           return () => {
                if (interval) clearInterval(interval);
           };
-     }, [isActive, isPreparing, timeLeft, prepTimeLeft, duration, preStartTime, restEndSound]);
+     }, [isActive, isPaused, isPreparing, timeLeft, prepTimeLeft, duration, preStartTime, restEndSound]);
 
      useEffect(() => {
           if (shouldComplete) {

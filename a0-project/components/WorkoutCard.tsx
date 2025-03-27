@@ -137,12 +137,8 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                console.log("Timer started");
           } else if (isCompleted) {
                handleReset();
-          } else if (isTimerActive && !isPaused) {
-               setIsPaused(true);
-               console.log("Timer paused");
-          } else if (isTimerActive && isPaused) {
-               setIsPaused(false);
-               console.log("Timer resumed");
+          } else if (isTimerActive) {
+               setIsPaused(!isPaused);
           }
      };
 
@@ -242,6 +238,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     <Timer
                          duration={workout.duration}
                          isActive={isTimerActive}
+                         isPaused={isPaused}
                          onComplete={handleComplete}
                          prepTime={workout.prepTime}
                          preStartTime={workout.preStartTime}
