@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import WorkoutCard from "../components/WorkoutCard";
 import AddWorkoutButton from "../components/AddWorkoutButton";
 import AddWorkoutModal from "../components/AddWorkoutModal";
-import { Workout } from "../types/workout";
+import { Workout } from "../../types/workout";
 import { StackNavigationProp } from "@react-navigation/stack";
 
 type RootStackParamList = {
@@ -48,7 +48,8 @@ export default function HomeScreen({ navigation }: Props) {
      };
 
      const handleAddWorkout = async (workout: Workout) => {
-          const newWorkouts = [...workouts, { ...workout, id: Date.now().toString() }];
+          const newWorkout = { ...workout, id: Date.now().toString() };
+          const newWorkouts = [newWorkout, ...workouts]; // Insert new workout at the beginning
           setWorkouts(newWorkouts);
           await saveWorkouts(newWorkouts);
           setIsModalVisible(false);
@@ -88,7 +89,7 @@ export default function HomeScreen({ navigation }: Props) {
                     <View style={styles.headerContent}>
                          <Text style={styles.headerTitle}>운동 루틴</Text>
                          <Pressable onPress={goToHistory} style={styles.historyButton}>
-                              <Text style={styles.historyButtonText}>History</Text>
+                              <Text style={styles.historyButtonText}>기록</Text>
                          </Pressable>
                     </View>
                     <Text style={styles.headerSubtitle}>오늘도 열심히 운동해봐요! 💪</Text>
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
           marginBottom: 4,
      },
      historyButton: {
-          padding: 8,
+          padding: 15,
           backgroundColor: "rgba(255, 255, 255, 0.1)",
           borderRadius: 20,
      },

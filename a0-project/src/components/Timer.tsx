@@ -44,7 +44,6 @@ export default function Timer({
                     });
                     setSetEndSound(setEnd);
                     setRestEndSound(restEnd);
-                    console.log("Timer sounds loaded: set_end and rest_end");
                } catch (error) {
                     console.error("Error loading Timer sounds:", error);
                }

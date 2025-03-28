@@ -3,8 +3,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Toaster } from "sonner-native";
-import HomeScreen from "./screens/HomeScreen";
-import HistoryScreen from "./screens/HistoryScreen";
+import HomeScreen from "./src/screens/HomeScreen";
+import HistoryScreen from "./src/screens/HistoryScreen";
 
 const Stack = createNativeStackNavigator();
 

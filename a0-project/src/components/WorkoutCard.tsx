@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Pressable, Alert, Switch } from "react-native";
+import { View, Text, StyleSheet, Pressable, Switch, Modal, Animated } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Timer from "./Timer";
@@ -8,6 +8,7 @@ import { WorkoutHistory } from "../types/history";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { v4 as uuidv4 } from "uuid";
 import { Audio } from "expo-av";
+import logger from "../utils/logger"; // logger 임포트
 
 interface WorkoutCardProps {
      workout: Workout;
@@ -22,7 +23,7 @@ const saveWorkoutHistory = async (historyItem: WorkoutHistory) => {
           historyArray.push(historyItem);
           await AsyncStorage.setItem("workoutHistory", JSON.stringify(historyArray));
      } catch (error) {
-          console.error("Error saving workout history:", error);
+          logger.error("Error saving workout history:", error);
      }
 };
 
@@ -37,6 +38,8 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
      const [backgroundMusic, setBackgroundMusic] = useState<Audio.Sound | null>(null);
      const [isMusicEnabled, setIsMusicEnabled] = useState(false);
      const [selectedTrack, setSelectedTrack] = useState("music1");
+     const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+     const [modalScale] = useState(new Animated.Value(0));
 
      const musicTracks = {
           music1: require("../assets/music1.mp3"),
@@ -59,9 +62,9 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     });
                     await endSound.setVolumeAsync(1.0);
                     setWorkoutEndSound(endSound);
-                    console.log("Workout end sound loaded successfully with volume 1.0");
+                    logger.log("Workout end sound loaded successfully with volume 1.0");
                } catch (error) {
-                    console.error("Failed to load workout end sound:", error);
+                    logger.error("Failed to load workout end sound:", error);
                }
           };
           initializeSounds();
@@ -76,7 +79,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           const loadBackgroundMusic = async () => {
                if (backgroundMusic) {
                     await backgroundMusic.unloadAsync();
-                    console.log(`Unloaded previous ${selectedTrack}`);
+                    logger.log(`Unloaded previous ${selectedTrack}`);
                }
                try {
                     const { sound } = await Audio.Sound.createAsync(musicTracks[selectedTrack], {
@@ -84,9 +87,9 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     });
                     await sound.setVolumeAsync(0.7);
                     setBackgroundMusic(sound);
-                    console.log(`Background music ${selectedTrack} loaded successfully with volume 0.7`);
+                    logger.log(`Background music ${selectedTrack} loaded successfully with volume 0.7`);
                } catch (error) {
-                    console.error(`Failed to load background music ${selectedTrack}:`, error);
+                    logger.error(`Failed to load background music ${selectedTrack}:`, error);
                }
           };
           loadBackgroundMusic();
@@ -95,37 +98,54 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
      useEffect(() => {
           const controlMusic = async () => {
                if (!backgroundMusic) {
-                    console.warn(`Background music ${selectedTrack} not initialized yet`);
+                    logger.warn(`Background music ${selectedTrack} not initialized yet`);
                     return;
                }
-               console.log(
+               logger.log(
                     `ControlMusic: isMusicEnabled=${isMusicEnabled}, isTimerActive=${isTimerActive}, isPaused=${isPaused}`
                );
                try {
                     if (isMusicEnabled && isTimerActive && !isPaused) {
                          await backgroundMusic.setIsLoopingAsync(true);
                          await backgroundMusic.playAsync();
-                         console.log(`Playing ${selectedTrack}`);
+                         logger.log(`Playing ${selectedTrack}`);
                     } else if (backgroundMusic) {
                          await backgroundMusic.pauseAsync();
-                         console.log(`Paused ${selectedTrack}`);
+                         logger.log(`Paused ${selectedTrack}`);
                     }
                } catch (error) {
-                    console.error(`Error controlling background music ${selectedTrack}:`, error);
+                    logger.error(`Error controlling background music ${selectedTrack}:`, error);
                }
           };
           controlMusic();
      }, [isTimerActive, isPaused, isMusicEnabled, backgroundMusic]);
+
+     useEffect(() => {
+          if (isDeleteModalVisible) {
+               Animated.spring(modalScale, {
+                    toValue: 1,
+                    friction: 8,
+                    tension: 40,
+                    useNativeDriver: true,
+               }).start();
+          } else {
+               Animated.timing(modalScale, {
+                    toValue: 0,
+                    duration: 200,
+                    useNativeDriver: true,
+               }).start();
+          }
+     }, [isDeleteModalVisible]);
 
      const playWorkoutEndSound = async () => {
           try {
                if (workoutEndSound) {
                     await workoutEndSound.setVolumeAsync(1.0);
                     await workoutEndSound.replayAsync();
-                    console.log("Workout end sound played with volume 1.0");
+                    logger.log("Workout end sound played with volume 1.0");
                }
           } catch (error) {
-               console.error("Error playing workout end sound:", error);
+               logger.error("Error playing workout end sound:", error);
           }
      };
 
@@ -134,7 +154,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                setStartTime(new Date());
                setIsTimerActive(true);
                setIsPaused(false);
-               console.log("Timer started");
+               logger.log("Timer started");
           } else if (isCompleted) {
                handleReset();
           } else if (isTimerActive) {
@@ -162,7 +182,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           setIsCompleted(false);
           setStartTime(null);
           setTotalTime(0);
-          console.log("Timer reset");
+          logger.log("Timer reset");
      };
 
      const celebrateCompletion = () => {
@@ -203,101 +223,120 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           });
      };
 
+     const handleDeleteConfirm = () => {
+          onDelete(workout.id);
+          setIsDeleteModalVisible(false);
+     };
+
+     const handleDeleteCancel = () => {
+          setIsDeleteModalVisible(false);
+     };
+
      return (
-          <View style={styles.card}>
-               <Pressable onPress={handlePress} style={styles.pressableArea}>
-                    <View style={styles.header}>
-                         <Text style={styles.title}>{workout.name}</Text>
-                         <View style={styles.actions}>
-                              <Pressable
-                                   onPress={() => {
-                                        console.log("Editing workout:", workout);
-                                        onEdit(workout);
-                                   }}
-                                   style={styles.actionButton}
-                              >
-                                   <MaterialCommunityIcons name="pencil" size={24} color="#666" />
-                              </Pressable>
-                              <Pressable
-                                   onPress={() => {
-                                        Alert.alert("루틴 삭제", `해당 루틴을 삭제합니다. "${workout.name}"?`, [
-                                             { text: "취소", style: "cancel" },
-                                             {
-                                                  text: "확인",
-                                                  onPress: () => onDelete(workout.id),
-                                                  style: "destructive",
-                                             },
-                                        ]);
-                                   }}
-                                   style={styles.actionButton}
-                              >
-                                   <MaterialCommunityIcons name="delete" size={24} color="#666" />
-                              </Pressable>
+          <>
+               <View
+                    style={[
+                         styles.card,
+                         {
+                              backgroundColor: isCompleted
+                                   ? "rgba(33, 150, 243, 0.9)"
+                                   : isPaused
+                                   ? "#FF4444"
+                                   : workout.backgroundColor,
+                         },
+                    ]}
+               >
+                    <Pressable onPress={handlePress} style={styles.pressableArea}>
+                         <View style={styles.header}>
+                              <Text style={styles.title}>{workout.name}</Text>
+                              <View style={styles.actions}>
+                                   <Pressable
+                                        onPress={() => {
+                                             logger.log("Editing workout:", workout);
+                                             onEdit(workout);
+                                        }}
+                                        style={styles.actionButton}
+                                   >
+                                        <MaterialCommunityIcons name="pencil" size={24} color="lightgray" />
+                                   </Pressable>
+                                   <Pressable onPress={() => setIsDeleteModalVisible(true)} style={styles.actionButton}>
+                                        <MaterialCommunityIcons name="delete" size={24} color="lightgray" />
+                                   </Pressable>
+                              </View>
                          </View>
-                    </View>
-                    <Timer
-                         duration={workout.duration}
-                         isActive={isTimerActive}
-                         isPaused={isPaused}
-                         onComplete={handleComplete}
-                         prepTime={workout.prepTime}
-                         preStartTime={workout.preStartTime}
-                    />
-                    <View style={styles.footer}>
-                         <Text style={styles.repeatText}>
-                              반복: {repeatCount}/{workout.repeatCount === 0 ? "∞" : workout.repeatCount}
-                         </Text>
-                         <Pressable onPress={handleReset} style={styles.resetButton}>
-                              <MaterialIcons name="replay" size={24} color="#FFFFFF" />
-                         </Pressable>
-                    </View>
-
-                    {isPaused && isTimerActive && (
-                         <View style={styles.pauseOverlay}>
-                              <Text style={styles.pauseText}></Text>
-                         </View>
-                    )}
-
-                    {isCompleted && (
-                         <View style={styles.completedOverlay}>
-                              <Text style={styles.completedText}>대단해요!</Text>
-                              <MaterialIcons name="celebration" size={40} color="#FFD700" />
-                              <Text style={styles.totalTimeText}>
-                                   총 소요시간: {Math.floor(totalTime / 60)}분 {totalTime % 60}초
-                              </Text>
-                         </View>
-                    )}
-               </Pressable>
-
-               {/* 음악 제어 UI */}
-               <View style={styles.musicControl}>
-                    <View style={styles.switchContainer}>
-                         <Text style={styles.musicLabel}>배경 음악</Text>
-                         <Switch
-                              value={isMusicEnabled}
-                              onValueChange={(value) => setIsMusicEnabled(value)}
-                              trackColor={{ false: "#767577", true: "#81b0ff" }}
-                              thumbColor={isMusicEnabled ? "#f5dd4b" : "#f4f3f4"}
+                         <Timer
+                              duration={workout.duration}
+                              isActive={isTimerActive}
+                              isPaused={isPaused}
+                              onComplete={handleComplete}
+                              prepTime={workout.prepTime}
+                              preStartTime={workout.preStartTime}
                          />
+                         <View style={styles.footer}>
+                              <Text style={styles.repeatText}>
+                                   반복: {repeatCount}/{workout.repeatCount === 0 ? "∞" : workout.repeatCount}
+                              </Text>
+                              <Pressable onPress={handleReset} style={styles.resetButton}>
+                                   <MaterialIcons name="replay" size={24} color="#FFFFFF" />
+                              </Pressable>
+                         </View>
+
+                         {isCompleted && (
+                              <View style={styles.completedMessage}>
+                                   <Text style={styles.completedText}>대단해요!</Text>
+                                   <MaterialIcons name="celebration" size={40} color="#FFD700" />
+                                   <Text style={styles.totalTimeText}>
+                                        총 소요시간: {Math.floor(totalTime / 60)}분 {totalTime % 60}초
+                                   </Text>
+                              </View>
+                         )}
+                    </Pressable>
+
+                    <View style={styles.musicControl}>
+                         <View style={styles.switchContainer}>
+                              <Text style={styles.musicLabel}>배경 음악</Text>
+                              <Switch
+                                   value={isMusicEnabled}
+                                   onValueChange={(value) => setIsMusicEnabled(value)}
+                                   trackColor={{ false: "#767577", true: "#81b0ff" }}
+                                   thumbColor={isMusicEnabled ? "#f5dd4b" : "#f4f3f4"}
+                              />
+                         </View>
+                         <Picker
+                              selectedValue={selectedTrack}
+                              onValueChange={(itemValue: any) => setSelectedTrack(itemValue)}
+                              style={styles.picker}
+                              enabled={isMusicEnabled}
+                         >
+                              <Picker.Item label="Music 1" value="music1" />
+                              <Picker.Item label="Music 2" value="music2" />
+                              <Picker.Item label="Music 3" value="music3" />
+                         </Picker>
                     </View>
-                    <Picker
-                         selectedValue={selectedTrack}
-                         onValueChange={(itemValue: any) => setSelectedTrack(itemValue)}
-                         style={styles.picker}
-                         enabled={isMusicEnabled}
-                    >
-                         <Picker.Item label="Music 1" value="music1" />
-                         <Picker.Item label="Music 2" value="music2" />
-                         <Picker.Item label="Music 3" value="music3" />
-                    </Picker>
                </View>
-          </View>
+
+               <Modal visible={isDeleteModalVisible} transparent={true} animationType="none">
+                    <View style={styles.modalOverlay}>
+                         <Animated.View style={[styles.deleteModal, { transform: [{ scale: modalScale }] }]}>
+                              <Text style={styles.modalTitle}>루틴 삭제</Text>
+                              <Text style={styles.modalMessage}>'{workout.name}' 루틴을 삭제하시겠습니까?</Text>
+                              <View style={styles.modalButtons}>
+                                   <Pressable style={styles.cancelButton} onPress={handleDeleteCancel}>
+                                        <Text style={styles.buttonText}>취소</Text>
+                                   </Pressable>
+                                   <Pressable style={styles.confirmButton} onPress={handleDeleteConfirm}>
+                                        <Text style={styles.buttonText}>확인</Text>
+                                   </Pressable>
+                              </View>
+                         </Animated.View>
+                    </View>
+               </Modal>
+          </>
      );
 }
 
 const styles = StyleSheet.create({
      card: {
-          backgroundColor: "#2196F3",
           borderRadius: 16,
           padding: 20,
           marginBottom: 16,
@@ -345,24 +384,10 @@ const styles = StyleSheet.create({
           backgroundColor: "rgba(255, 255, 255, 0.2)",
           borderRadius: 20,
      },
-     pauseOverlay: {
-          ...StyleSheet.absoluteFillObject,
-          backgroundColor: "rgba(150, 230, 170, 0.1)",
+     completedMessage: {
           justifyContent: "center",
           alignItems: "center",
-          borderRadius: 16,
-     },
-     pauseText: {
-          fontSize: 32,
-          fontWeight: "bold",
-          color: "#FFFFFF",
-     },
-     completedOverlay: {
-          ...StyleSheet.absoluteFillObject,
-          backgroundColor: "rgba(33, 150, 243, 0.9)",
-          justifyContent: "center",
-          alignItems: "center",
-          borderRadius: 16,
+          marginTop: 20,
      },
      completedText: {
           fontSize: 36,
@@ -394,5 +419,57 @@ const styles = StyleSheet.create({
           width: "100%",
           color: "#FFFFFF",
           marginTop: 8,
+     },
+     modalOverlay: {
+          flex: 1,
+          backgroundColor: "rgba(0, 0, 0, 0.7)",
+          justifyContent: "center",
+          alignItems: "center",
+     },
+     deleteModal: {
+          backgroundColor: "#2C2C2C",
+          borderRadius: 16,
+          padding: 20,
+          width: "80%",
+          maxWidth: 350,
+          alignItems: "center",
+     },
+     modalTitle: {
+          fontSize: 20,
+          fontWeight: "bold",
+          color: "#FFFFFF",
+          marginBottom: 12,
+     },
+     modalMessage: {
+          fontSize: 16,
+          color: "#BBBBBB",
+          textAlign: "center",
+          marginBottom: 20,
+     },
+     modalButtons: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          width: "100%",
+     },
+     cancelButton: {
+          flex: 1,
+          backgroundColor: "#555",
+          padding: 12,
+          borderRadius: 8,
+          alignItems: "center",
+          marginRight: 8,
+     },
+     confirmButton: {
+          flex: 1,
+          backgroundColor: "#FF4444",
+          padding: 12,
+          borderRadius: 8,
+          alignItems: "center",
+          marginLeft: 8,
+     },
+     buttonText: {
+          fontSize: 16,
+          color: "#FFFFFF",
+          fontWeight: "600",
      },
 });
