@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import WorkoutCard from "../components/WorkoutCard";
 import AddWorkoutButton from "../components/AddWorkoutButton";
 import AddWorkoutModal from "../components/AddWorkoutModal";
-import { Workout } from "../../types/workout";
+import { Workout } from "../types/workout";
 import { StackNavigationProp } from "@react-navigation/stack";
 
 type RootStackParamList = {

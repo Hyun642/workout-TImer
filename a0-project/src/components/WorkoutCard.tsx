@@ -8,7 +8,7 @@ import { WorkoutHistory } from "../types/history";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { v4 as uuidv4 } from "uuid";
 import { Audio } from "expo-av";
-import logger from "../utils/logger"; // logger 임포트
+import logger from "../utils/logger";
 
 interface WorkoutCardProps {
      workout: Workout;
@@ -27,6 +27,10 @@ const saveWorkoutHistory = async (historyItem: WorkoutHistory) => {
      }
 };
 
+// musicTracks의 키 타입 정의
+type MusicTrackKey = "music1" | "music2" | "music3";
+type MusicTracks = Record<MusicTrackKey, number>;
+
 export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardProps) {
      const [isTimerActive, setIsTimerActive] = useState(false);
      const [repeatCount, setRepeatCount] = useState(0);
@@ -37,11 +41,11 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
      const [workoutEndSound, setWorkoutEndSound] = useState<Audio.Sound | null>(null);
      const [backgroundMusic, setBackgroundMusic] = useState<Audio.Sound | null>(null);
      const [isMusicEnabled, setIsMusicEnabled] = useState(false);
-     const [selectedTrack, setSelectedTrack] = useState("music1");
+     const [selectedTrack, setSelectedTrack] = useState<MusicTrackKey>("music1"); // 타입 제한
      const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
      const [modalScale] = useState(new Animated.Value(0));
 
-     const musicTracks = {
+     const musicTracks: MusicTracks = {
           music1: require("../assets/music1.mp3"),
           music2: require("../assets/music2.mp3"),
           music3: require("../assets/music3.mp3"),
@@ -304,7 +308,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                          </View>
                          <Picker
                               selectedValue={selectedTrack}
-                              onValueChange={(itemValue: any) => setSelectedTrack(itemValue)}
+                              onValueChange={(itemValue: MusicTrackKey) => setSelectedTrack(itemValue)} // 타입 지정
                               style={styles.picker}
                               enabled={isMusicEnabled}
                          >

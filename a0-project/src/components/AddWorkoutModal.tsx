@@ -27,7 +27,7 @@ interface AddWorkoutModalProps {
      visible: boolean;
      onClose: () => void;
      onSubmit: (workout: Workout) => void;
-     initialWorkout?: Workout;
+     initialWorkout: Workout | null | undefined;
 }
 
 const LABELS = {
