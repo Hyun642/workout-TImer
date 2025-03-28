@@ -4,12 +4,12 @@
           "slug": "snack-3ae235c3-be1c-40c6-983e-ae6f26879abb",
           "version": "1.0.0",
           "orientation": "portrait",
-          "icon": "./assets/icon.png",
+          "icon": "./src/assets/icon.png",
           "userInterfaceStyle": "light",
           "newArchEnabled": true,
           "assetBundlePatterns": ["**/*"],
           "splash": {
-               "image": "./assets/splash-icon.png",
+               "image": "./src/assets/splash-icon.png",
                "resizeMode": "contain",
                "backgroundColor": "#ffffff"
           },
@@ -18,13 +18,19 @@
           },
           "android": {
                "adaptiveIcon": {
-                    "foregroundImage": "./assets/adaptive-icon.png",
+                    "foregroundImage": "./src/assets/adaptive-icon.png",
                     "backgroundColor": "#ffffff"
-               }
+               },
+               "package": "com.hyunnnnn.snack3ae235c3be1c40c6983eae6f26879abb"
           },
           "web": {
-               "favicon": "./assets/favicon.png"
+               "favicon": "./src/assetss/favicon.png"
           },
-          "description": "Quickly generate React Native components with AI"
+          "description": "Quickly generate React Native components with AI",
+          "extra": {
+               "eas": {
+                    "projectId": "248dffe1-78ea-4909-898c-51856ef7597c"
+               }
+          }
      }
 }
