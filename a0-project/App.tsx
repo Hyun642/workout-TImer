@@ -1,6 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { StyleSheet } from "react-native";
+import { StatusBar, StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Toaster } from "sonner-native";
 import HomeScreen from "./src/screens/HomeScreen";
@@ -26,6 +26,7 @@ export default function App() {
      return (
           <SafeAreaProvider style={styles.container}>
                <Toaster />
+               <StatusBar barStyle="light-content" backgroundColor="#121212" />
                <NavigationContainer>
                     <RootStack />
                </NavigationContainer>
