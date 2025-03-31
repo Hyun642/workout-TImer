@@ -27,7 +27,6 @@ const saveWorkoutHistory = async (historyItem: WorkoutHistory) => {
      }
 };
 
-// musicTracks의 키 타입 정의
 type MusicTrackKey = "music1" | "music2" | "music3";
 type MusicTracks = Record<MusicTrackKey, number>;
 
@@ -41,8 +40,9 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
      const [workoutEndSound, setWorkoutEndSound] = useState<Audio.Sound | null>(null);
      const [backgroundMusic, setBackgroundMusic] = useState<Audio.Sound | null>(null);
      const [isMusicEnabled, setIsMusicEnabled] = useState(false);
-     const [selectedTrack, setSelectedTrack] = useState<MusicTrackKey>("music1"); // 타입 제한
+     const [selectedTrack, setSelectedTrack] = useState<MusicTrackKey>("music1");
      const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+     const [isResetModalVisible, setIsResetModalVisible] = useState(false);
      const [modalScale] = useState(new Animated.Value(0));
 
      const musicTracks: MusicTracks = {
@@ -125,7 +125,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
      }, [isTimerActive, isPaused, isMusicEnabled, backgroundMusic]);
 
      useEffect(() => {
-          if (isDeleteModalVisible) {
+          if (isDeleteModalVisible || isResetModalVisible) {
                Animated.spring(modalScale, {
                     toValue: 1,
                     friction: 8,
@@ -139,7 +139,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     useNativeDriver: true,
                }).start();
           }
-     }, [isDeleteModalVisible]);
+     }, [isDeleteModalVisible, isResetModalVisible]);
 
      const playWorkoutEndSound = async () => {
           try {
@@ -164,6 +164,10 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           } else if (isTimerActive) {
                setIsPaused(!isPaused);
           }
+     };
+
+     const handleResetPress = () => {
+          setIsResetModalVisible(true);
      };
 
      const handleReset = () => {
@@ -280,7 +284,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                               <Text style={styles.repeatText}>
                                    반복: {repeatCount}/{workout.repeatCount === 0 ? "∞" : workout.repeatCount}
                               </Text>
-                              <Pressable onPress={handleReset} style={styles.resetButton}>
+                              <Pressable onPress={handleResetPress} style={styles.resetButton}>
                                    <MaterialIcons name="replay" size={24} color="#FFFFFF" />
                               </Pressable>
                          </View>
@@ -306,16 +310,18 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                                    thumbColor={isMusicEnabled ? "#f5dd4b" : "#f4f3f4"}
                               />
                          </View>
-                         <Picker
-                              selectedValue={selectedTrack}
-                              onValueChange={(itemValue: MusicTrackKey) => setSelectedTrack(itemValue)} // 타입 지정
-                              style={styles.picker}
-                              enabled={isMusicEnabled}
-                         >
-                              <Picker.Item label="Music 1" value="music1" />
-                              <Picker.Item label="Music 2" value="music2" />
-                              <Picker.Item label="Music 3" value="music3" />
-                         </Picker>
+                         {isMusicEnabled && (
+                              <Picker
+                                   selectedValue={selectedTrack}
+                                   onValueChange={(itemValue: MusicTrackKey) => setSelectedTrack(itemValue)}
+                                   style={styles.picker}
+                                   enabled={isMusicEnabled}
+                              >
+                                   <Picker.Item label="Music 1" value="music1" />
+                                   <Picker.Item label="Music 2" value="music2" />
+                                   <Picker.Item label="Music 3" value="music3" />
+                              </Picker>
+                         )}
                     </View>
                </View>
 
@@ -329,6 +335,29 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                                         <Text style={styles.buttonText}>취소</Text>
                                    </Pressable>
                                    <Pressable style={styles.confirmButton} onPress={handleDeleteConfirm}>
+                                        <Text style={styles.buttonText}>확인</Text>
+                                   </Pressable>
+                              </View>
+                         </Animated.View>
+                    </View>
+               </Modal>
+
+               <Modal visible={isResetModalVisible} transparent={true} animationType="none">
+                    <View style={styles.modalOverlay}>
+                         <Animated.View style={[styles.resetModal, { transform: [{ scale: modalScale }] }]}>
+                              <Text style={styles.modalTitle}>처음으로</Text>
+                              <Text style={styles.modalMessage}>진행 상황이 초기화됩니다.</Text>
+                              <View style={styles.modalButtons}>
+                                   <Pressable style={styles.cancelButton} onPress={() => setIsResetModalVisible(false)}>
+                                        <Text style={styles.buttonText}>취소</Text>
+                                   </Pressable>
+                                   <Pressable
+                                        style={styles.confirmButton}
+                                        onPress={() => {
+                                             setIsResetModalVisible(false);
+                                             handleReset();
+                                        }}
+                                   >
                                         <Text style={styles.buttonText}>확인</Text>
                                    </Pressable>
                               </View>
@@ -431,6 +460,14 @@ const styles = StyleSheet.create({
           alignItems: "center",
      },
      deleteModal: {
+          backgroundColor: "#2C2C2C",
+          borderRadius: 16,
+          padding: 20,
+          width: "80%",
+          maxWidth: 350,
+          alignItems: "center",
+     },
+     resetModal: {
           backgroundColor: "#2C2C2C",
           borderRadius: 16,
           padding: 20,
