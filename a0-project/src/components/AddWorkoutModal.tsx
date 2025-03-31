@@ -10,8 +10,6 @@ import {
      TouchableWithoutFeedback,
      Keyboard,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Picker } from "@react-native-picker/picker";
 
 interface Workout {
      id: string;
@@ -20,7 +18,7 @@ interface Workout {
      repeatCount: number;
      prepTime: number;
      preStartTime: number;
-     backgroundColor: string; // 배경색 필드 추가
+     backgroundColor: string;
 }
 
 interface AddWorkoutModalProps {
@@ -32,17 +30,16 @@ interface AddWorkoutModalProps {
 
 const LABELS = {
      name: "루틴 이름",
-     duration: "운동 시간 (초)",
-     preStartTime: "시작 전 준비 시간 (초)",
-     prepTime: "대기 시간 (초)",
+     duration: "1세트 시간 (초)",
+     preStartTime: "루틴 시작 전 준비 시간 (초)",
+     prepTime: "중간 휴식 시간 (초)",
      repeatCount: "반복 횟수 (무한 반복은 0)",
      backgroundColor: "배경색",
 };
 
-// 색상 선택지 정의
 const COLOR_OPTIONS = [
      { label: "녹색", value: "#4CAF50" },
-     { label: "주황색", value: "#FF5722" },
+     // { label: "주황색", value: "#kDBA901" },
      { label: "보라색", value: "#ad71f8" },
      { label: "파랑색", value: "#0049f0" },
 ];
@@ -52,7 +49,7 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
      const [duration, setDuration] = useState(initialWorkout?.duration.toString() || "");
      const [repeatCount, setRepeatCount] = useState(initialWorkout?.repeatCount.toString() || "");
      const [prepTime, setPrepTime] = useState(initialWorkout?.prepTime.toString() || "");
-     const [preStartTime, setPreStartTime] = useState(initialWorkout?.preStartTime?.toString() || "3");
+     const [preStartTime, setPreStartTime] = useState(initialWorkout?.preStartTime?.toString() || "10");
      const [backgroundColor, setBackgroundColor] = useState(initialWorkout?.backgroundColor || COLOR_OPTIONS[0].value);
      const [shakeNameAnimation] = useState(new Animated.Value(0));
      const [shakeDurationAnimation] = useState(new Animated.Value(0));
@@ -169,7 +166,7 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
                repeatCount: parseInt(repeatCount, 10) || 0,
                prepTime: parseInt(prepTime, 10) || 5,
                preStartTime: parseInt(preStartTime, 10) || 3,
-               backgroundColor, // 선택된 배경색 추가
+               backgroundColor,
           };
 
           onSubmit(workoutData);
@@ -180,7 +177,7 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
                setRepeatCount("");
                setPrepTime("");
                setPreStartTime("3");
-               setBackgroundColor(COLOR_OPTIONS[0].value); // 초기화 시 기본 색상으로 설정
+               setBackgroundColor(COLOR_OPTIONS[0].value);
           }
      };
 
@@ -202,6 +199,7 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
                                              style={[styles.input, { fontSize: 20, fontWeight: "bold" }]}
                                              value={name}
                                              onChangeText={setName}
+                                             maxLength={13}
                                         />
                                    </Animated.View>
                               </View>
@@ -256,35 +254,30 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
 
                               <View style={styles.fieldContainer}>
                                    <Text style={styles.label}>{LABELS.backgroundColor}</Text>
-                                   <Picker
-                                        selectedValue={backgroundColor}
-                                        onValueChange={(itemValue) => setBackgroundColor(itemValue)}
-                                        style={styles.picker}
-                                   >
+                                   <View style={styles.colorPickerContainer}>
                                         {COLOR_OPTIONS.map((option) => (
-                                             <Picker.Item
+                                             <Pressable
                                                   key={option.value}
-                                                  label={option.label}
-                                                  value={option.value}
+                                                  style={[
+                                                       styles.colorButton,
+                                                       { backgroundColor: option.value },
+                                                       backgroundColor === option.value && styles.selectedColor,
+                                                  ]}
+                                                  onPress={() => setBackgroundColor(option.value)}
                                              />
                                         ))}
-                                   </Picker>
+                                   </View>
                               </View>
 
                               <View style={styles.buttonContainer}>
                                    <Pressable style={[styles.button, styles.cancelButton]} onPress={onClose}>
                                         <Text style={styles.buttonText}>취소</Text>
                                    </Pressable>
-                                   <LinearGradient
-                                        colors={["#4CAF50", "#45a049"]}
-                                        style={[styles.button, styles.submitButton]}
-                                   >
-                                        <Pressable onPress={handleSubmit}>
-                                             <Text style={[styles.buttonText, styles.submitButtonText]}>
-                                                  {initialWorkout ? "수정" : "추가"}
-                                             </Text>
-                                        </Pressable>
-                                   </LinearGradient>
+                                   <Pressable onPress={handleSubmit} style={[styles.button, styles.submitButton]}>
+                                        <Text style={[styles.buttonText, styles.submitButtonText]}>
+                                             {initialWorkout ? "수정" : "추가"}
+                                        </Text>
+                                   </Pressable>
                               </View>
                          </Animated.View>
                     </View>
@@ -338,11 +331,6 @@ const styles = StyleSheet.create({
           backgroundColor: "#3A3A3A",
           color: "#FFFFFF",
      },
-     picker: {
-          backgroundColor: "#3A3A3A",
-          color: "#FFFFFF",
-          borderRadius: 12,
-     },
      buttonContainer: {
           flexDirection: "row",
           justifyContent: "flex-end",
@@ -357,14 +345,36 @@ const styles = StyleSheet.create({
      buttonText: {
           fontSize: 16,
           fontWeight: "600",
+          textAlign: "center",
      },
      cancelButton: {
-          backgroundColor: "#555",
+          backgroundColor: "gray",
      },
      submitButton: {
-          backgroundColor: "transparent",
+          backgroundColor: "#4CAF50",
      },
      submitButtonText: {
           color: "#FFFFFF",
+     },
+     colorPickerContainer: {
+          flexDirection: "row",
+          justifyContent: "space-around",
+          marginTop: 10,
+          paddingHorizontal: 10,
+          paddingVertical: 10,
+          backgroundColor: "#3A3A3A",
+          borderColor: "#555",
+          borderWidth: 1,
+          borderRadius: 12,
+     },
+     colorButton: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          marginHorizontal: 10,
+     },
+     selectedColor: {
+          borderWidth: 3,
+          borderColor: "#FFFFFF",
      },
 });
