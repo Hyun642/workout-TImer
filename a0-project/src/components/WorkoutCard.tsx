@@ -94,6 +94,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           };
      }, []);
 
+     // 배경 음악 로드
      useEffect(() => {
           const loadBackgroundMusic = async () => {
                setIsMusicLoading(true);
@@ -117,6 +118,18 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           loadBackgroundMusic();
      }, [selectedTrack]);
 
+     // 볼륨 업데이트
+     useEffect(() => {
+          const updateVolume = async () => {
+               if (backgroundMusic) {
+                    await backgroundMusic.setVolumeAsync(volume);
+                    logger.log(`Volume set to ${volume}`);
+               }
+          };
+          updateVolume();
+     }, [volume, backgroundMusic]);
+
+     // 배경 음악 제어
      useEffect(() => {
           const controlMusic = async () => {
                if (isMusicLoading || !backgroundMusic) {
@@ -136,18 +149,12 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     logger.error(`Error controlling background music ${selectedTrack}:`, error);
                }
           };
-          controlMusic();
-     }, [isTimerActive, isPaused, isMusicEnabled, backgroundMusic, isMusicLoading]);
 
-     useEffect(() => {
-          const updateVolume = async () => {
-               if (backgroundMusic) {
-                    await backgroundMusic.setVolumeAsync(volume);
-                    logger.log(`Volume set to ${volume}`);
-               }
-          };
-          updateVolume();
-     }, [volume, backgroundMusic]);
+          // 음악 제어 조건이 충족될 때만 실행
+          if (backgroundMusic && !isMusicLoading) {
+               controlMusic();
+          }
+     }, [isTimerActive, isPaused, isMusicEnabled, backgroundMusic, isMusicLoading]);
 
      useEffect(() => {
           if (isDeleteModalVisible || isResetModalVisible) {
@@ -222,6 +229,27 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           logger.log("Timer reset");
      };
 
+     const celebrateCompletion = (finalRepeatCount: number) => {
+          setIsCompleted(true);
+          if (startTime) {
+               const endTime = new Date();
+               const timeDiff = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+               setTotalTime(timeDiff);
+
+               const historyItem: WorkoutHistory = {
+                    id: uuidv4(),
+                    workoutId: workout.id,
+                    workoutName: workout.name,
+                    startTime: startTime.toISOString(),
+                    endTime: endTime.toISOString(),
+                    totalRepetitions: finalRepeatCount,
+                    completed: true,
+               };
+               saveWorkoutHistory(historyItem);
+               playWorkoutEndSound();
+          }
+     };
+
      const handleComplete = () => {
           setRepeatCount((prev) => {
                const newCount = prev + 1;
@@ -246,27 +274,6 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                }
                return newCount;
           });
-     };
-
-     const celebrateCompletion = (finalRepeatCount: number) => {
-          setIsCompleted(true);
-          if (startTime) {
-               const endTime = new Date();
-               const timeDiff = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
-               setTotalTime(timeDiff);
-
-               const historyItem: WorkoutHistory = {
-                    id: uuidv4(),
-                    workoutId: workout.id,
-                    workoutName: workout.name,
-                    startTime: startTime.toISOString(),
-                    endTime: endTime.toISOString(),
-                    totalRepetitions: finalRepeatCount,
-                    completed: true,
-               };
-               saveWorkoutHistory(historyItem);
-               playWorkoutEndSound();
-          }
      };
 
      const handleCycleRestComplete = () => {
