@@ -315,6 +315,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                               cycleRestTime={workout.cycleRestTime}
                               isCycleResting={isCycleResting}
                               onCycleRestComplete={handleCycleRestComplete}
+                              workoutName={workout.name}
                          />
                          <View style={styles.footer}>
                               <View>

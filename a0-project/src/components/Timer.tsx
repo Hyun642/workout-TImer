@@ -13,6 +13,7 @@ interface TimerProps {
      cycleRestTime: number;
      isCycleResting: boolean;
      onCycleRestComplete: () => void;
+     workoutName: string;
 }
 
 export default function Timer({
@@ -25,6 +26,7 @@ export default function Timer({
      cycleRestTime,
      isCycleResting,
      onCycleRestComplete,
+     workoutName,
 }: TimerProps) {
      const [timeLeft, setTimeLeft] = useState(duration);
      const [preStartTimeLeft, setPreStartTimeLeft] = useState(preStartTime);
@@ -36,7 +38,6 @@ export default function Timer({
      const [restEndSound, setRestEndSound] = useState<Audio.Sound | null>(null);
      const [setEndSound, setSetEndSound] = useState<Audio.Sound | null>(null);
 
-     // 사운드 로드
      useEffect(() => {
           const loadSounds = async () => {
                try {
@@ -61,7 +62,6 @@ export default function Timer({
           };
      }, []);
 
-     // 타이머 초기화
      useEffect(() => {
           if (!isActive) {
                setTimeLeft(duration);
@@ -74,28 +74,24 @@ export default function Timer({
           }
      }, [isActive, duration, preStartTime, prepTime, cycleRestTime]);
 
-     // 시작 전 준비 시간 초기화
      useEffect(() => {
           if (isPreStarting) {
                setPreStartTimeLeft(preStartTime);
           }
      }, [isPreStarting, preStartTime]);
 
-     // 1회 당 휴식 시간 초기화
      useEffect(() => {
           if (isResting) {
                setPrepTimeLeft(prepTime);
           }
      }, [isResting, prepTime]);
 
-     // 세트 간 휴식 시간 초기화
      useEffect(() => {
           if (isCycleResting) {
                setCycleRestTimeLeft(cycleRestTime);
           }
      }, [isCycleResting, cycleRestTime]);
 
-     // 시작 전 준비 시간 카운트다운
      useEffect(() => {
           let interval: NodeJS.Timeout | null = null;
           if (isActive && !isPaused && isPreStarting && preStartTimeLeft > 0) {
@@ -117,7 +113,6 @@ export default function Timer({
           };
      }, [isActive, isPaused, isPreStarting, preStartTimeLeft, restEndSound]);
 
-     // 세트 간 휴식 시간 카운트다운
      useEffect(() => {
           let interval: NodeJS.Timeout | null = null;
           if (isActive && !isPaused && isCycleResting && cycleRestTimeLeft > 0) {
@@ -130,7 +125,6 @@ export default function Timer({
           };
      }, [isActive, isPaused, isCycleResting, cycleRestTimeLeft]);
 
-     // 세트 간 휴식 시간 종료
      useEffect(() => {
           if (isCycleResting && cycleRestTimeLeft <= 0) {
                if (restEndSound) {
@@ -140,7 +134,6 @@ export default function Timer({
           }
      }, [isCycleResting, cycleRestTimeLeft, onCycleRestComplete, restEndSound]);
 
-     // 1회 당 휴식 시간 카운트다운
      useEffect(() => {
           let interval: NodeJS.Timeout | null = null;
           if (isActive && !isPaused && isResting && prepTimeLeft > 0) {
@@ -153,7 +146,6 @@ export default function Timer({
           };
      }, [isActive, isPaused, isResting, prepTimeLeft]);
 
-     // 1회 당 휴식 시간 종료
      useEffect(() => {
           if (isResting && prepTimeLeft <= 0) {
                setIsResting(false);
@@ -163,7 +155,6 @@ export default function Timer({
           }
      }, [isResting, prepTimeLeft, restEndSound]);
 
-     // 운동 시간 카운트다운
      useEffect(() => {
           let interval: NodeJS.Timeout | null = null;
           if (isActive && !isPaused && !isPreStarting && !isCycleResting && !isResting && timeLeft > 0) {
@@ -176,14 +167,12 @@ export default function Timer({
           };
      }, [isActive, isPaused, isPreStarting, isCycleResting, isResting, timeLeft]);
 
-     // 운동 완료 처리
      useEffect(() => {
           if (isActive && !isPaused && !isPreStarting && !isCycleResting && !isResting && timeLeft <= 0) {
                setShouldComplete(true);
           }
      }, [isActive, isPaused, isPreStarting, isCycleResting, isResting, timeLeft]);
 
-     // 운동 완료 후 처리
      useEffect(() => {
           if (shouldComplete) {
                onComplete();

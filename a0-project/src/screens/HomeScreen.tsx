@@ -7,6 +7,8 @@ import AddWorkoutButton from "../components/AddWorkoutButton";
 import AddWorkoutModal from "../components/AddWorkoutModal";
 import { Workout } from "../types/workout";
 import { StackNavigationProp } from "@react-navigation/stack";
+import { v4 as uuidv4 } from "uuid";
+import logger from "../utils/logger";
 
 type RootStackParamList = {
      Home: undefined;
@@ -35,7 +37,7 @@ export default function HomeScreen({ navigation }: Props) {
                     setWorkouts(JSON.parse(savedWorkouts));
                }
           } catch (error) {
-               console.error("Error loading workouts:", error);
+               logger.error("Error loading workouts:", error);
           }
      };
 
@@ -43,12 +45,12 @@ export default function HomeScreen({ navigation }: Props) {
           try {
                await AsyncStorage.setItem("workouts", JSON.stringify(newWorkouts));
           } catch (error) {
-               console.error("Error saving workouts:", error);
+               logger.error("Error saving workouts:", error);
           }
      };
 
      const handleAddWorkout = async (workout: Workout) => {
-          const newWorkout = { ...workout, id: Date.now().toString() };
+          const newWorkout = { ...workout, id: uuidv4() };
           const newWorkouts = [newWorkout, ...workouts];
           setWorkouts(newWorkouts);
           await saveWorkouts(newWorkouts);
@@ -115,8 +117,8 @@ export default function HomeScreen({ navigation }: Props) {
                <AddWorkoutModal
                     visible={isModalVisible}
                     onClose={closeModal}
-                    onSubmit={editingWorkout ? handleEditWorkout : handleAddWorkout}
-                    initialWorkout={editingWorkout}
+                    onAdd={editingWorkout ? handleEditWorkout : handleAddWorkout}
+                    workoutToEdit={editingWorkout}
                />
           </SafeAreaView>
      );
