@@ -9,6 +9,8 @@ import {
      Animated,
      TouchableWithoutFeedback,
      Keyboard,
+     ScrollView,
+     Dimensions,
 } from "react-native";
 
 interface Workout {
@@ -18,6 +20,8 @@ interface Workout {
      repeatCount: number;
      prepTime: number;
      preStartTime: number;
+     cycleCount: number;
+     cycleRestTime: number;
      backgroundColor: string;
 }
 
@@ -28,34 +32,42 @@ interface AddWorkoutModalProps {
      initialWorkout: Workout | null | undefined;
 }
 
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
 const LABELS = {
-     name: "루틴 이름",
-     duration: "1세트 시간 (초)",
-     preStartTime: "루틴 시작 전 준비 시간 (초)",
-     prepTime: "중간 휴식 시간 (초)",
-     repeatCount: "반복 횟수 (무한 반복은 0)",
+     name: "운동명",
+     preStartTime: "시작 전 준비 시간 (초)",
+     duration: "1회 당 시간 (초)",
+     prepTime: "1회 당 휴식 시간 (초)",
+     repeatCount: "횟수 (무한 반복은 0)",
+     cycleCount: "세트 횟수",
+     cycleRestTime: "세트 간 휴식 시간 (초)",
      backgroundColor: "배경색",
 };
 
 const COLOR_OPTIONS = [
      { label: "녹색", value: "#4CAF50" },
-     // { label: "주황색", value: "#kDBA901" },
      { label: "보라색", value: "#ad71f8" },
      { label: "파랑색", value: "#0049f0" },
+     { label: "빨간색", value: "#FF4444" },
 ];
 
 export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWorkout }: AddWorkoutModalProps) {
      const [name, setName] = useState(initialWorkout?.name || "");
      const [duration, setDuration] = useState(initialWorkout?.duration.toString() || "");
-     const [repeatCount, setRepeatCount] = useState(initialWorkout?.repeatCount.toString() || "");
-     const [prepTime, setPrepTime] = useState(initialWorkout?.prepTime.toString() || "");
+     const [repeatCount, setRepeatCount] = useState(initialWorkout?.repeatCount.toString() || "12");
+     const [prepTime, setPrepTime] = useState(initialWorkout?.prepTime.toString() || "0");
      const [preStartTime, setPreStartTime] = useState(initialWorkout?.preStartTime?.toString() || "10");
+     const [cycleCount, setCycleCount] = useState(initialWorkout?.cycleCount?.toString() || "1");
+     const [cycleRestTime, setCycleRestTime] = useState(initialWorkout?.cycleRestTime?.toString() || "60");
      const [backgroundColor, setBackgroundColor] = useState(initialWorkout?.backgroundColor || COLOR_OPTIONS[0].value);
      const [shakeNameAnimation] = useState(new Animated.Value(0));
      const [shakeDurationAnimation] = useState(new Animated.Value(0));
      const [shakePreStartTimeAnimation] = useState(new Animated.Value(0));
      const [shakePrepTimeAnimation] = useState(new Animated.Value(0));
      const [shakeRepeatCountAnimation] = useState(new Animated.Value(0));
+     const [shakeCycleCountAnimation] = useState(new Animated.Value(0));
+     const [shakeCycleRestTimeAnimation] = useState(new Animated.Value(0));
      const [modalScale] = useState(new Animated.Value(0));
 
      useEffect(() => {
@@ -65,6 +77,8 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
                setRepeatCount(initialWorkout.repeatCount.toString());
                setPrepTime(initialWorkout.prepTime.toString());
                setPreStartTime(initialWorkout.preStartTime.toString());
+               setCycleCount(initialWorkout.cycleCount?.toString() || "1");
+               setCycleRestTime(initialWorkout.cycleRestTime?.toString() || "60");
                setBackgroundColor(initialWorkout.backgroundColor || COLOR_OPTIONS[0].value);
           }
      }, [initialWorkout]);
@@ -131,6 +145,24 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
           ]).start();
      };
 
+     const shakeCycleCount = () => {
+          Animated.sequence([
+               Animated.timing(shakeCycleCountAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
+               Animated.timing(shakeCycleCountAnimation, { toValue: -10, duration: 100, useNativeDriver: true }),
+               Animated.timing(shakeCycleCountAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
+               Animated.timing(shakeCycleCountAnimation, { toValue: 0, duration: 100, useNativeDriver: true }),
+          ]).start();
+     };
+
+     const shakeCycleRestTime = () => {
+          Animated.sequence([
+               Animated.timing(shakeCycleRestTimeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
+               Animated.timing(shakeCycleRestTimeAnimation, { toValue: -10, duration: 100, useNativeDriver: true }),
+               Animated.timing(shakeCycleRestTimeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
+               Animated.timing(shakeCycleRestTimeAnimation, { toValue: 0, duration: 100, useNativeDriver: true }),
+          ]).start();
+     };
+
      const handleSubmit = () => {
           let hasError = false;
 
@@ -154,6 +186,14 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
                shakeRepeatCount();
                hasError = true;
           }
+          if (!cycleCount) {
+               shakeCycleCount();
+               hasError = true;
+          }
+          if (!cycleRestTime) {
+               shakeCycleRestTime();
+               hasError = true;
+          }
 
           if (hasError) {
                return;
@@ -164,8 +204,10 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
                name,
                duration: parseInt(duration, 10),
                repeatCount: parseInt(repeatCount, 10) || 0,
-               prepTime: parseInt(prepTime, 10) || 5,
+               prepTime: parseInt(prepTime, 10) || 0,
                preStartTime: parseInt(preStartTime, 10) || 3,
+               cycleCount: parseInt(cycleCount, 10) || 1,
+               cycleRestTime: parseInt(cycleRestTime, 10) || 60,
                backgroundColor,
           };
 
@@ -174,9 +216,11 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
           if (!initialWorkout) {
                setName("");
                setDuration("");
-               setRepeatCount("");
-               setPrepTime("");
+               setRepeatCount("12");
+               setPrepTime("0");
                setPreStartTime("3");
+               setCycleCount("1");
+               setCycleRestTime("60");
                setBackgroundColor(COLOR_OPTIONS[0].value);
           }
      };
@@ -191,83 +235,120 @@ export default function AddWorkoutModal({ visible, onClose, onSubmit, initialWor
                     <View style={styles.modalOverlay}>
                          <Animated.View style={[styles.modalContent, { transform: [{ scale: modalScale }] }]}>
                               <Text style={styles.headerText}>{initialWorkout ? "루틴 편집" : "새 루틴"}</Text>
-
-                              <View style={styles.fieldContainer}>
-                                   <Text style={styles.label}>{LABELS.name}</Text>
-                                   <Animated.View style={{ transform: [{ translateX: shakeNameAnimation }] }}>
-                                        <TextInput
-                                             style={[styles.input, { fontSize: 20, fontWeight: "bold" }]}
-                                             value={name}
-                                             onChangeText={setName}
-                                             maxLength={13}
-                                        />
-                                   </Animated.View>
-                              </View>
-
-                              <View style={styles.fieldContainer}>
-                                   <Text style={styles.label}>{LABELS.preStartTime}</Text>
-                                   <Animated.View style={{ transform: [{ translateX: shakePreStartTimeAnimation }] }}>
-                                        <TextInput
-                                             style={styles.input}
-                                             value={preStartTime}
-                                             onChangeText={setPreStartTime}
-                                             keyboardType="number-pad"
-                                        />
-                                   </Animated.View>
-                              </View>
-
-                              <View style={styles.fieldContainer}>
-                                   <Text style={styles.label}>{LABELS.duration}</Text>
-                                   <Animated.View style={{ transform: [{ translateX: shakeDurationAnimation }] }}>
-                                        <TextInput
-                                             style={styles.input}
-                                             value={duration}
-                                             onChangeText={setDuration}
-                                             keyboardType="number-pad"
-                                        />
-                                   </Animated.View>
-                              </View>
-
-                              <View style={styles.fieldContainer}>
-                                   <Text style={styles.label}>{LABELS.prepTime}</Text>
-                                   <Animated.View style={{ transform: [{ translateX: shakePrepTimeAnimation }] }}>
-                                        <TextInput
-                                             style={styles.input}
-                                             value={prepTime}
-                                             onChangeText={setPrepTime}
-                                             keyboardType="number-pad"
-                                        />
-                                   </Animated.View>
-                              </View>
-
-                              <View style={styles.fieldContainer}>
-                                   <Text style={styles.label}>{LABELS.repeatCount}</Text>
-                                   <Animated.View style={{ transform: [{ translateX: shakeRepeatCountAnimation }] }}>
-                                        <TextInput
-                                             style={styles.input}
-                                             value={repeatCount}
-                                             onChangeText={setRepeatCount}
-                                             keyboardType="number-pad"
-                                        />
-                                   </Animated.View>
-                              </View>
-
-                              <View style={styles.fieldContainer}>
-                                   <Text style={styles.label}>{LABELS.backgroundColor}</Text>
-                                   <View style={styles.colorPickerContainer}>
-                                        {COLOR_OPTIONS.map((option) => (
-                                             <Pressable
-                                                  key={option.value}
-                                                  style={[
-                                                       styles.colorButton,
-                                                       { backgroundColor: option.value },
-                                                       backgroundColor === option.value && styles.selectedColor,
-                                                  ]}
-                                                  onPress={() => setBackgroundColor(option.value)}
+                              <ScrollView
+                                   contentContainerStyle={styles.scrollContent}
+                                   showsVerticalScrollIndicator={false}
+                                   keyboardShouldPersistTaps="handled"
+                              >
+                                   <View style={styles.fieldContainer}>
+                                        <Text style={styles.label}>{LABELS.name}</Text>
+                                        <Animated.View style={{ transform: [{ translateX: shakeNameAnimation }] }}>
+                                             <TextInput
+                                                  style={[styles.input, { fontSize: 20, fontWeight: "bold" }]}
+                                                  value={name}
+                                                  onChangeText={setName}
+                                                  maxLength={13}
                                              />
-                                        ))}
+                                        </Animated.View>
                                    </View>
-                              </View>
+
+                                   <View style={styles.fieldContainer}>
+                                        <Text style={styles.label}>{LABELS.preStartTime}</Text>
+                                        <Animated.View
+                                             style={{ transform: [{ translateX: shakePreStartTimeAnimation }] }}
+                                        >
+                                             <TextInput
+                                                  style={styles.input}
+                                                  value={preStartTime}
+                                                  onChangeText={setPreStartTime}
+                                                  keyboardType="number-pad"
+                                             />
+                                        </Animated.View>
+                                   </View>
+
+                                   <View style={styles.fieldContainer}>
+                                        <Text style={styles.label}>{LABELS.duration}</Text>
+                                        <Animated.View style={{ transform: [{ translateX: shakeDurationAnimation }] }}>
+                                             <TextInput
+                                                  style={styles.input}
+                                                  value={duration}
+                                                  onChangeText={setDuration}
+                                                  keyboardType="number-pad"
+                                             />
+                                        </Animated.View>
+                                   </View>
+
+                                   <View style={styles.fieldContainer}>
+                                        <Text style={styles.label}>{LABELS.prepTime}</Text>
+                                        <Animated.View style={{ transform: [{ translateX: shakePrepTimeAnimation }] }}>
+                                             <TextInput
+                                                  style={styles.input}
+                                                  value={prepTime}
+                                                  onChangeText={setPrepTime}
+                                                  keyboardType="number-pad"
+                                             />
+                                        </Animated.View>
+                                   </View>
+
+                                   <View style={styles.fieldContainer}>
+                                        <Text style={styles.label}>{LABELS.repeatCount}</Text>
+                                        <Animated.View
+                                             style={{ transform: [{ translateX: shakeRepeatCountAnimation }] }}
+                                        >
+                                             <TextInput
+                                                  style={styles.input}
+                                                  value={repeatCount}
+                                                  onChangeText={setRepeatCount}
+                                                  keyboardType="number-pad"
+                                             />
+                                        </Animated.View>
+                                   </View>
+
+                                   <View style={styles.fieldContainer}>
+                                        <Text style={styles.label}>{LABELS.cycleCount}</Text>
+                                        <Animated.View
+                                             style={{ transform: [{ translateX: shakeCycleCountAnimation }] }}
+                                        >
+                                             <TextInput
+                                                  style={styles.input}
+                                                  value={cycleCount}
+                                                  onChangeText={setCycleCount}
+                                                  keyboardType="number-pad"
+                                             />
+                                        </Animated.View>
+                                   </View>
+
+                                   <View style={styles.fieldContainer}>
+                                        <Text style={styles.label}>{LABELS.cycleRestTime}</Text>
+                                        <Animated.View
+                                             style={{ transform: [{ translateX: shakeCycleRestTimeAnimation }] }}
+                                        >
+                                             <TextInput
+                                                  style={styles.input}
+                                                  value={cycleRestTime}
+                                                  onChangeText={setCycleRestTime}
+                                                  keyboardType="number-pad"
+                                             />
+                                        </Animated.View>
+                                   </View>
+
+                                   <View style={styles.fieldContainer}>
+                                        <Text style={styles.label}>{LABELS.backgroundColor}</Text>
+                                        <View style={styles.colorPickerContainer}>
+                                             {COLOR_OPTIONS.map((option) => (
+                                                  <Pressable
+                                                       key={option.value}
+                                                       style={[
+                                                            styles.colorButton,
+                                                            { backgroundColor: option.value },
+                                                            backgroundColor === option.value && styles.selectedColor,
+                                                       ]}
+                                                       onPress={() => setBackgroundColor(option.value)}
+                                                  />
+                                             ))}
+                                        </View>
+                                   </View>
+                              </ScrollView>
 
                               <View style={styles.buttonContainer}>
                                    <Pressable style={[styles.button, styles.cancelButton]} onPress={onClose}>
@@ -306,6 +387,10 @@ const styles = StyleSheet.create({
           shadowOpacity: 0.3,
           shadowRadius: 8,
           elevation: 10,
+          maxHeight: SCREEN_HEIGHT * 0.7,
+     },
+     scrollContent: {
+          paddingBottom: 20,
      },
      headerText: {
           fontSize: 24,

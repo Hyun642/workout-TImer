@@ -6,4 +6,6 @@ export interface Workout {
      prepTime: number;
      preStartTime: number;
      backgroundColor: string;
+     cycleRestTime: number;
+     cycleCount: number;
 }

@@ -6,7 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { v4 as uuidv4 } from "uuid";
-import logger from "../utils/logger"; // logger 임포트
+import logger from "../utils/logger";
 
 interface HistoryItemProps {
      item: WorkoutHistory;

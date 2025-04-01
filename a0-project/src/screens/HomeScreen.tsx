@@ -49,7 +49,7 @@ export default function HomeScreen({ navigation }: Props) {
 
      const handleAddWorkout = async (workout: Workout) => {
           const newWorkout = { ...workout, id: Date.now().toString() };
-          const newWorkouts = [newWorkout, ...workouts]; // Insert new workout at the beginning
+          const newWorkouts = [newWorkout, ...workouts];
           setWorkouts(newWorkouts);
           await saveWorkouts(newWorkouts);
           setIsModalVisible(false);

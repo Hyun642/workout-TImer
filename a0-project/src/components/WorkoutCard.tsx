@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Pressable, Switch, Modal, Animated } from "react-native";
 import Slider from "@react-native-community/slider";
 import { Picker } from "@react-native-picker/picker";
-import * as Progress from "react-native-progress";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Timer from "./Timer";
 import { Workout } from "../types/workout";
@@ -35,8 +34,10 @@ type MusicTracks = Record<MusicTrackKey, number>;
 export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardProps) {
      const [isTimerActive, setIsTimerActive] = useState(false);
      const [repeatCount, setRepeatCount] = useState(0);
+     const [setCount, setSetCount] = useState(1);
      const [isPaused, setIsPaused] = useState(false);
      const [isCompleted, setIsCompleted] = useState(false);
+     const [isCycleResting, setIsCycleResting] = useState(false);
      const [startTime, setStartTime] = useState<Date | null>(null);
      const [totalTime, setTotalTime] = useState<number>(0);
      const [workoutEndSound, setWorkoutEndSound] = useState<Audio.Sound | null>(null);
@@ -47,7 +48,6 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
      const [isResetModalVisible, setIsResetModalVisible] = useState(false);
      const [modalScale] = useState(new Animated.Value(0));
      const [volume, setVolume] = useState(0.2);
-     const [progress, setProgress] = useState(0);
 
      const musicTracks: MusicTracks = {
           music1: require("../assets/music1.mp3"),
@@ -136,37 +136,9 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
      }, [volume, backgroundMusic]);
 
      useEffect(() => {
-          logger.log(`Progress updated: ${progress}`); // Debugging progress
-     }, [progress]);
-
-     useEffect(() => {
-          let isMounted = true;
-          const loadBackgroundMusic = async () => {
-               if (backgroundMusic) {
-                    await backgroundMusic.unloadAsync();
-               }
-               try {
-                    const { sound } = await Audio.Sound.createAsync(musicTracks[selectedTrack], {
-                         shouldPlay: false,
-                    });
-                    if (isMounted) {
-                         await sound.setVolumeAsync(volume);
-                         setBackgroundMusic(sound);
-                    }
-               } catch (error) {
-                    logger.error(`Failed to load background music ${selectedTrack}:`, error);
-               }
-          };
-          loadBackgroundMusic();
-          return () => {
-               isMounted = false;
-          };
-     }, [selectedTrack]);
-
-     useEffect(() => {
           if (isDeleteModalVisible || isResetModalVisible) {
                Animated.spring(modalScale, {
-                    toValue: isDeleteModalVisible || isResetModalVisible ? 1 : 0,
+                    toValue: 1,
                     friction: 8,
                     tension: 40,
                     useNativeDriver: true,
@@ -225,11 +197,12 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
 
           setIsTimerActive(false);
           setRepeatCount(0);
+          setSetCount(1);
           setIsPaused(false);
           setIsCompleted(false);
+          setIsCycleResting(false);
           setStartTime(null);
           setTotalTime(0);
-          setProgress(0);
           logger.log("Timer reset");
      };
 
@@ -258,10 +231,19 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           setRepeatCount((prev) => {
                const newCount = prev + 1;
                if (workout.repeatCount !== 0 && newCount >= workout.repeatCount) {
-                    setIsTimerActive(false);
-                    setIsPaused(false);
-                    celebrateCompletion();
-                    return newCount;
+                    setSetCount((prevSet) => {
+                         const newSetCount = prevSet + 1;
+                         if (workout.cycleCount !== 0 && newSetCount > workout.cycleCount) {
+                              setIsTimerActive(false);
+                              setIsPaused(false);
+                              setIsCycleResting(false);
+                              celebrateCompletion();
+                              return prevSet;
+                         }
+                         setIsCycleResting(true);
+                         return newSetCount;
+                    });
+                    return 0;
                }
                if (workout.repeatCount === 0 || newCount < workout.repeatCount) {
                     setIsTimerActive(true);
@@ -269,6 +251,12 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                }
                return newCount;
           });
+     };
+
+     const handleCycleRestComplete = () => {
+          setIsCycleResting(false);
+          setIsTimerActive(true);
+          setIsPaused(false);
      };
 
      const handleDeleteConfirm = async () => {
@@ -324,23 +312,19 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                               onComplete={handleComplete}
                               prepTime={workout.prepTime}
                               preStartTime={workout.preStartTime}
-                              onProgress={(progress) => {
-                                   requestAnimationFrame(() => setProgress(progress));
-                              }}
-                         />
-                         <Progress.Bar
-                              progress={progress}
-                              width={null}
-                              color="#rgba(255, 46, 37, 0.8)"
-                              unfilledColor="rgba(255, 255, 255, 0.3)"
-                              borderWidth={0}
-                              height={10}
-                              style={styles.progressBar}
+                              cycleRestTime={workout.cycleRestTime}
+                              isCycleResting={isCycleResting}
+                              onCycleRestComplete={handleCycleRestComplete}
                          />
                          <View style={styles.footer}>
-                              <Text style={styles.repeatText}>
-                                   반복: {repeatCount}/{workout.repeatCount === 0 ? "∞" : workout.repeatCount}
-                              </Text>
+                              <View>
+                                   <Text style={styles.repeatText}>
+                                        횟수: {repeatCount}/{workout.repeatCount === 0 ? "∞" : workout.repeatCount}
+                                   </Text>
+                                   <Text style={styles.setText}>
+                                        세트: {setCount}/{workout.cycleCount === 0 ? "∞" : workout.cycleCount}
+                                   </Text>
+                              </View>
                               <Pressable onPress={handleResetPress} style={styles.resetButton}>
                                    <MaterialIcons name="replay" size={24} color="#FFFFFF" />
                               </Pressable>
@@ -384,7 +368,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                                         style={styles.volumeSlider}
                                         minimumValue={0}
                                         maximumValue={100}
-                                        step={5} // 5% 단위로 조절
+                                        step={5}
                                         value={volume * 100}
                                         onValueChange={(value) => setVolume(value / 100)}
                                    />
@@ -396,8 +380,8 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                <Modal visible={isDeleteModalVisible} transparent={true} animationType="none">
                     <View style={styles.modalOverlay}>
                          <Animated.View style={[styles.deleteModal, { transform: [{ scale: modalScale }] }]}>
-                              <Text style={styles.modalTitle}>루틴 삭제</Text>
-                              <Text style={styles.modalMessage}>'{workout.name}' 루틴을 삭제하시겠습니까?</Text>
+                              <Text style={styles.modalTitle}>운동 삭제</Text>
+                              <Text style={styles.modalMessage}>'{workout.name}' 운동을 삭제하시겠습니까?</Text>
                               <View style={styles.modalButtons}>
                                    <Pressable style={styles.cancelButton} onPress={handleDeleteCancel}>
                                         <Text style={styles.buttonText}>취소</Text>
@@ -477,8 +461,14 @@ const styles = StyleSheet.create({
      },
      repeatText: {
           fontSize: 16,
-          color: "#BBBBBB",
+          color: "#ffffff",
           fontWeight: "500",
+     },
+     setText: {
+          fontSize: 16,
+          color: "#ffffff",
+          fontWeight: "500",
+          marginTop: 4,
      },
      resetButton: {
           padding: 8,
@@ -529,9 +519,6 @@ const styles = StyleSheet.create({
      volumeSlider: {
           width: "100%",
           height: 40,
-     },
-     progressBar: {
-          marginTop: 10,
      },
      modalOverlay: {
           flex: 1,
