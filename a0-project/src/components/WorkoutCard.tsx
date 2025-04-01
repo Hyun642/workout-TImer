@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Pressable, Switch, Modal, Animated } from "react-native";
+import Slider from "@react-native-community/slider";
 import { Picker } from "@react-native-picker/picker";
+import * as Progress from "react-native-progress";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Timer from "./Timer";
 import { Workout } from "../types/workout";
@@ -44,6 +46,8 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
      const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
      const [isResetModalVisible, setIsResetModalVisible] = useState(false);
      const [modalScale] = useState(new Animated.Value(0));
+     const [volume, setVolume] = useState(0.2);
+     const [progress, setProgress] = useState(0);
 
      const musicTracks: MusicTracks = {
           music1: require("../assets/music1.mp3"),
@@ -89,9 +93,9 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     const { sound } = await Audio.Sound.createAsync(musicTracks[selectedTrack], {
                          shouldPlay: false,
                     });
-                    await sound.setVolumeAsync(0.7);
+                    await sound.setVolumeAsync(volume);
                     setBackgroundMusic(sound);
-                    logger.log(`Background music ${selectedTrack} loaded successfully with volume 0.7`);
+                    logger.log(`Background music ${selectedTrack} loaded successfully with volume ${volume}`);
                } catch (error) {
                     logger.error(`Failed to load background music ${selectedTrack}:`, error);
                }
@@ -105,9 +109,6 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     logger.warn(`Background music ${selectedTrack} not initialized yet`);
                     return;
                }
-               logger.log(
-                    `ControlMusic: isMusicEnabled=${isMusicEnabled}, isTimerActive=${isTimerActive}, isPaused=${isPaused}`
-               );
                try {
                     if (isMusicEnabled && isTimerActive && !isPaused) {
                          await backgroundMusic.setIsLoopingAsync(true);
@@ -125,9 +126,47 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
      }, [isTimerActive, isPaused, isMusicEnabled, backgroundMusic]);
 
      useEffect(() => {
+          const updateVolume = async () => {
+               if (backgroundMusic) {
+                    await backgroundMusic.setVolumeAsync(volume);
+                    logger.log(`Volume set to ${volume}`);
+               }
+          };
+          updateVolume();
+     }, [volume, backgroundMusic]);
+
+     useEffect(() => {
+          logger.log(`Progress updated: ${progress}`); // Debugging progress
+     }, [progress]);
+
+     useEffect(() => {
+          let isMounted = true;
+          const loadBackgroundMusic = async () => {
+               if (backgroundMusic) {
+                    await backgroundMusic.unloadAsync();
+               }
+               try {
+                    const { sound } = await Audio.Sound.createAsync(musicTracks[selectedTrack], {
+                         shouldPlay: false,
+                    });
+                    if (isMounted) {
+                         await sound.setVolumeAsync(volume);
+                         setBackgroundMusic(sound);
+                    }
+               } catch (error) {
+                    logger.error(`Failed to load background music ${selectedTrack}:`, error);
+               }
+          };
+          loadBackgroundMusic();
+          return () => {
+               isMounted = false;
+          };
+     }, [selectedTrack]);
+
+     useEffect(() => {
           if (isDeleteModalVisible || isResetModalVisible) {
                Animated.spring(modalScale, {
-                    toValue: 1,
+                    toValue: isDeleteModalVisible || isResetModalVisible ? 1 : 0,
                     friction: 8,
                     tension: 40,
                     useNativeDriver: true,
@@ -190,6 +229,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           setIsCompleted(false);
           setStartTime(null);
           setTotalTime(0);
+          setProgress(0);
           logger.log("Timer reset");
      };
 
@@ -231,7 +271,12 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           });
      };
 
-     const handleDeleteConfirm = () => {
+     const handleDeleteConfirm = async () => {
+          if (backgroundMusic) {
+               await backgroundMusic.stopAsync();
+               await backgroundMusic.unloadAsync();
+               logger.log("Background music stopped and unloaded on delete");
+          }
           onDelete(workout.id);
           setIsDeleteModalVisible(false);
      };
@@ -249,7 +294,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                               backgroundColor: isCompleted
                                    ? "rgba(33, 150, 243, 0.9)"
                                    : isPaused
-                                   ? "#FF4444"
+                                   ? "#FA4E4C"
                                    : workout.backgroundColor,
                          },
                     ]}
@@ -279,6 +324,18 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                               onComplete={handleComplete}
                               prepTime={workout.prepTime}
                               preStartTime={workout.preStartTime}
+                              onProgress={(progress) => {
+                                   requestAnimationFrame(() => setProgress(progress));
+                              }}
+                         />
+                         <Progress.Bar
+                              progress={progress}
+                              width={null}
+                              color="#rgba(255, 46, 37, 0.8)"
+                              unfilledColor="rgba(255, 255, 255, 0.3)"
+                              borderWidth={0}
+                              height={10}
+                              style={styles.progressBar}
                          />
                          <View style={styles.footer}>
                               <Text style={styles.repeatText}>
@@ -311,16 +368,27 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                               />
                          </View>
                          {isMusicEnabled && (
-                              <Picker
-                                   selectedValue={selectedTrack}
-                                   onValueChange={(itemValue: MusicTrackKey) => setSelectedTrack(itemValue)}
-                                   style={styles.picker}
-                                   enabled={isMusicEnabled}
-                              >
-                                   <Picker.Item label="Music 1" value="music1" />
-                                   <Picker.Item label="Music 2" value="music2" />
-                                   <Picker.Item label="Music 3" value="music3" />
-                              </Picker>
+                              <>
+                                   <Picker
+                                        selectedValue={selectedTrack}
+                                        onValueChange={(itemValue: MusicTrackKey) => setSelectedTrack(itemValue)}
+                                        style={styles.picker}
+                                        enabled={isMusicEnabled}
+                                   >
+                                        <Picker.Item label="Music 1" value="music1" />
+                                        <Picker.Item label="Music 2" value="music2" />
+                                        <Picker.Item label="Music 3" value="music3" />
+                                   </Picker>
+                                   <Text style={styles.volumeLabel}>볼륨: {Math.round(volume * 100)}%</Text>
+                                   <Slider
+                                        style={styles.volumeSlider}
+                                        minimumValue={0}
+                                        maximumValue={100}
+                                        step={5} // 5% 단위로 조절
+                                        value={volume * 100}
+                                        onValueChange={(value) => setVolume(value / 100)}
+                                   />
+                              </>
                          )}
                     </View>
                </View>
@@ -452,6 +520,18 @@ const styles = StyleSheet.create({
           width: "100%",
           color: "#FFFFFF",
           marginTop: 8,
+     },
+     volumeLabel: {
+          fontSize: 16,
+          color: "#FFFFFF",
+          marginTop: 8,
+     },
+     volumeSlider: {
+          width: "100%",
+          height: 40,
+     },
+     progressBar: {
+          marginTop: 10,
      },
      modalOverlay: {
           flex: 1,
