@@ -43,6 +43,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
      const [workoutEndSound, setWorkoutEndSound] = useState<Audio.Sound | null>(null);
      const [backgroundMusic, setBackgroundMusic] = useState<Audio.Sound | null>(null);
      const [isMusicEnabled, setIsMusicEnabled] = useState(false);
+     const [isMusicLoading, setIsMusicLoading] = useState(false);
      const [selectedTrack, setSelectedTrack] = useState<MusicTrackKey>("music1");
      const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
      const [isResetModalVisible, setIsResetModalVisible] = useState(false);
@@ -78,13 +79,24 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           initializeSounds();
 
           return () => {
-               if (workoutEndSound) workoutEndSound.unloadAsync();
-               if (backgroundMusic) backgroundMusic.unloadAsync();
+               if (workoutEndSound) {
+                    workoutEndSound.unloadAsync().then(() => {
+                         setWorkoutEndSound(null);
+                         logger.log("Workout end sound unloaded");
+                    });
+               }
+               if (backgroundMusic) {
+                    backgroundMusic.unloadAsync().then(() => {
+                         setBackgroundMusic(null);
+                         logger.log("Background music unloaded");
+                    });
+               }
           };
      }, []);
 
      useEffect(() => {
           const loadBackgroundMusic = async () => {
+               setIsMusicLoading(true);
                if (backgroundMusic) {
                     await backgroundMusic.unloadAsync();
                     logger.log(`Unloaded previous ${selectedTrack}`);
@@ -98,6 +110,8 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     logger.log(`Background music ${selectedTrack} loaded successfully with volume ${volume}`);
                } catch (error) {
                     logger.error(`Failed to load background music ${selectedTrack}:`, error);
+               } finally {
+                    setIsMusicLoading(false);
                }
           };
           loadBackgroundMusic();
@@ -105,8 +119,8 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
 
      useEffect(() => {
           const controlMusic = async () => {
-               if (!backgroundMusic) {
-                    logger.warn(`Background music ${selectedTrack} not initialized yet`);
+               if (isMusicLoading || !backgroundMusic) {
+                    logger.warn(`Background music ${selectedTrack} not ready yet. Loading: ${isMusicLoading}`);
                     return;
                }
                try {
@@ -114,7 +128,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                          await backgroundMusic.setIsLoopingAsync(true);
                          await backgroundMusic.playAsync();
                          logger.log(`Playing ${selectedTrack}`);
-                    } else if (backgroundMusic) {
+                    } else {
                          await backgroundMusic.pauseAsync();
                          logger.log(`Paused ${selectedTrack}`);
                     }
@@ -123,7 +137,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                }
           };
           controlMusic();
-     }, [isTimerActive, isPaused, isMusicEnabled, backgroundMusic]);
+     }, [isTimerActive, isPaused, isMusicEnabled, backgroundMusic, isMusicLoading]);
 
      useEffect(() => {
           const updateVolume = async () => {
@@ -154,11 +168,13 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
 
      const playWorkoutEndSound = async () => {
           try {
-               if (workoutEndSound) {
-                    await workoutEndSound.setVolumeAsync(1.0);
-                    await workoutEndSound.replayAsync();
-                    logger.log("Workout end sound played with volume 1.0");
+               if (!workoutEndSound) {
+                    logger.warn("Workout end sound not initialized");
+                    return;
                }
+               await workoutEndSound.setVolumeAsync(1.0);
+               await workoutEndSound.replayAsync();
+               logger.log("Workout end sound played with volume 1.0");
           } catch (error) {
                logger.error("Error playing workout end sound:", error);
           }
@@ -206,27 +222,6 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           logger.log("Timer reset");
      };
 
-     const celebrateCompletion = () => {
-          setIsCompleted(true);
-          if (startTime) {
-               const endTime = new Date();
-               const timeDiff = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
-               setTotalTime(timeDiff);
-
-               const historyItem: WorkoutHistory = {
-                    id: uuidv4(),
-                    workoutId: workout.id,
-                    workoutName: workout.name,
-                    startTime: startTime.toISOString(),
-                    endTime: endTime.toISOString(),
-                    totalRepetitions: repeatCount,
-                    completed: true,
-               };
-               saveWorkoutHistory(historyItem);
-               playWorkoutEndSound();
-          }
-     };
-
      const handleComplete = () => {
           setRepeatCount((prev) => {
                const newCount = prev + 1;
@@ -237,7 +232,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                               setIsTimerActive(false);
                               setIsPaused(false);
                               setIsCycleResting(false);
-                              celebrateCompletion();
+                              celebrateCompletion(newCount);
                               return prevSet;
                          }
                          setIsCycleResting(true);
@@ -251,6 +246,27 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                }
                return newCount;
           });
+     };
+
+     const celebrateCompletion = (finalRepeatCount: number) => {
+          setIsCompleted(true);
+          if (startTime) {
+               const endTime = new Date();
+               const timeDiff = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+               setTotalTime(timeDiff);
+
+               const historyItem: WorkoutHistory = {
+                    id: uuidv4(),
+                    workoutId: workout.id,
+                    workoutName: workout.name,
+                    startTime: startTime.toISOString(),
+                    endTime: endTime.toISOString(),
+                    totalRepetitions: finalRepeatCount,
+                    completed: true,
+               };
+               saveWorkoutHistory(historyItem);
+               playWorkoutEndSound();
+          }
      };
 
      const handleCycleRestComplete = () => {
@@ -462,12 +478,12 @@ const styles = StyleSheet.create({
      },
      repeatText: {
           fontSize: 16,
-          color: "#ffffff",
+          color: "#BBBBBB",
           fontWeight: "500",
      },
      setText: {
           fontSize: 16,
-          color: "#ffffff",
+          color: "#BBBBBB",
           fontWeight: "500",
           marginTop: 4,
      },
