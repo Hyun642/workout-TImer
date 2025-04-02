@@ -76,6 +76,21 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                title: "자신감 by SellBuyMusic",
                url: "https://sellbuymusic.com/md/mlqtnhf-vfczzbz",
           },
+          "운동 종료": {
+               provider: "셀바이뮤직",
+               title: "Di-Ding 4",
+               url: "https://sellbuymusic.com/md/sjrnctt-ofczzbz",
+          },
+          "휴식 종료": {
+               provider: "셀바이뮤직",
+               title: "Pop up 3",
+               url: "https://sellbuymusic.com/md/seyqcbb-dfczzbz",
+          },
+          "세트 종료": {
+               provider: "셀바이뮤직",
+               title: "Blop Sound",
+               url: "https://sellbuymusic.com/md/sejnxkz-jfczzbz",
+          },
      };
 
      useEffect(() => {
