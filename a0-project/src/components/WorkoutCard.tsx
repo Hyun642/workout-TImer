@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Pressable, Switch, Modal, Animated } from "react-native";
+import { View, Text, StyleSheet, Pressable, Switch, Modal, Animated, ScrollView } from "react-native";
 import Slider from "@react-native-community/slider";
 import { Picker } from "@react-native-picker/picker";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -50,6 +50,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      const [selectedTrack, setSelectedTrack] = useState<MusicTrackKey>("music1");
      const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
      const [isResetModalVisible, setIsResetModalVisible] = useState(false);
+     const [isMusicInfoModalVisible, setIsMusicInfoModalVisible] = useState(false); // 음악 출처 모달 상태
      const [modalScale] = useState(new Animated.Value(0));
      const [volume, setVolume] = useState(0.2);
 
@@ -57,6 +58,24 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
           music1: require("../assets/music1.mp3"),
           music2: require("../assets/music2.mp3"),
           music3: require("../assets/music3.mp3"),
+     };
+
+     const musicInfo = {
+          music1: {
+               provider: "셀바이뮤직",
+               title: "hiro-in by SellBuyMusic",
+               url: "https://sellbuymusic.com/md/mdltntt-ifczzbz",
+          },
+          music2: {
+               provider: "셀바이뮤직",
+               title: "기타와 비트 by SellBuyMusic",
+               url: "https://sellbuymusic.com/md/mapzhkc-ufczzbz",
+          },
+          music3: {
+               provider: "셀바이뮤직",
+               title: "자신감 by SellBuyMusic",
+               url: "https://sellbuymusic.com/md/mlqtnhf-vfczzbz",
+          },
      };
 
      useEffect(() => {
@@ -156,7 +175,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      }, [isTimerActive, isPaused, isMusicEnabled, backgroundMusic, isMusicLoading]);
 
      useEffect(() => {
-          if (isDeleteModalVisible || isResetModalVisible) {
+          if (isDeleteModalVisible || isResetModalVisible || isMusicInfoModalVisible) {
                Animated.spring(modalScale, {
                     toValue: 1,
                     friction: 8,
@@ -170,7 +189,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                     useNativeDriver: true,
                }).start();
           }
-     }, [isDeleteModalVisible, isResetModalVisible]);
+     }, [isDeleteModalVisible, isResetModalVisible, isMusicInfoModalVisible]);
 
      const playWorkoutEndSound = async () => {
           try {
@@ -376,16 +395,24 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                          </View>
                          {isMusicEnabled && (
                               <>
-                                   <Picker
-                                        selectedValue={selectedTrack}
-                                        onValueChange={(itemValue: MusicTrackKey) => setSelectedTrack(itemValue)}
-                                        style={styles.picker}
-                                        enabled={isMusicEnabled}
-                                   >
-                                        <Picker.Item label="Music 1" value="music1" />
-                                        <Picker.Item label="Music 2" value="music2" />
-                                        <Picker.Item label="Music 3" value="music3" />
-                                   </Picker>
+                                   <View style={styles.musicPickerContainer}>
+                                        <Picker
+                                             selectedValue={selectedTrack}
+                                             onValueChange={(itemValue: MusicTrackKey) => setSelectedTrack(itemValue)}
+                                             style={styles.musicPicker}
+                                             enabled={isMusicEnabled}
+                                        >
+                                             <Picker.Item label="Music 1" value="music1" />
+                                             <Picker.Item label="Music 2" value="music2" />
+                                             <Picker.Item label="Music 3" value="music3" />
+                                        </Picker>
+                                        <Pressable
+                                             style={styles.infoButton}
+                                             onPress={() => setIsMusicInfoModalVisible(true)}
+                                        >
+                                             <MaterialIcons name="info-outline" size={22} color="lightgray" />
+                                        </Pressable>
+                                   </View>
                                    <Text style={styles.volumeLabel}>볼륨: {Math.round(volume * 100)}%</Text>
                                    <Slider
                                         style={styles.volumeSlider}
@@ -439,13 +466,36 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                          </Animated.View>
                     </View>
                </Modal>
+
+               <Modal visible={isMusicInfoModalVisible} transparent={true} animationType="none">
+                    <View style={styles.modalOverlay}>
+                         <Animated.View style={[styles.musicInfoModal, { transform: [{ scale: modalScale }] }]}>
+                              <Text style={styles.modalTitle}>음악 출처</Text>
+                              <ScrollView style={styles.musicInfoContent}>
+                                   {Object.entries(musicInfo).map(([track, info]) => (
+                                        <View key={track} style={styles.musicInfoItem}>
+                                             <Text style={styles.musicInfoTitle}>{track}:</Text>
+                                             <Text style={styles.musicInfoText}>
+                                                  ✔ Music provided by {info.provider}
+                                             </Text>
+                                             <Text style={styles.musicInfoText}>🎵 Title: {info.title}</Text>
+                                             <Text style={styles.musicInfoText}>{info.url}</Text>
+                                        </View>
+                                   ))}
+                              </ScrollView>
+                              <Pressable style={styles.closeButton} onPress={() => setIsMusicInfoModalVisible(false)}>
+                                   <Text style={styles.buttonText}>닫기</Text>
+                              </Pressable>
+                         </Animated.View>
+                    </View>
+               </Modal>
           </>
      );
 }
 
 const styles = StyleSheet.create({
      card: {
-          borderRadius: 16,
+          borderRadius: 30,
           padding: 20,
           marginBottom: 16,
           shadowColor: "#000",
@@ -483,13 +533,13 @@ const styles = StyleSheet.create({
           alignItems: "center",
      },
      repeatText: {
-          fontSize: 16,
-          color: "#BBBBBB",
+          fontSize: 18,
+          color: "lightgray",
           fontWeight: "500",
      },
      setText: {
-          fontSize: 16,
-          color: "#BBBBBB",
+          fontSize: 18,
+          color: "lightgray",
           fontWeight: "500",
           marginTop: 4,
      },
@@ -529,10 +579,20 @@ const styles = StyleSheet.create({
           fontSize: 16,
           color: "#FFFFFF",
      },
-     picker: {
-          width: "100%",
-          color: "#FFFFFF",
+     musicPickerContainer: {
+          flexDirection: "row",
+          alignItems: "center",
           marginTop: 8,
+     },
+     musicPicker: {
+          flex: 1,
+          color: "#FFFFFF",
+          borderRadius: 8,
+          padding: 4,
+     },
+     infoButton: {
+          padding: 8,
+          marginLeft: 8,
      },
      volumeLabel: {
           fontSize: 16,
@@ -565,17 +625,43 @@ const styles = StyleSheet.create({
           maxWidth: 350,
           alignItems: "center",
      },
+     musicInfoModal: {
+          backgroundColor: "#2C2C2C",
+          borderRadius: 16,
+          padding: 20,
+          width: "90%",
+          maxWidth: 400,
+          maxHeight: "80%",
+     },
      modalTitle: {
           fontSize: 20,
           fontWeight: "bold",
           color: "#FFFFFF",
           marginBottom: 12,
+          textAlign: "center",
      },
      modalMessage: {
           fontSize: 16,
           color: "#BBBBBB",
           textAlign: "center",
           marginBottom: 20,
+     },
+     musicInfoContent: {
+          marginBottom: 20,
+     },
+     musicInfoItem: {
+          marginBottom: 16,
+     },
+     musicInfoTitle: {
+          fontSize: 16,
+          fontWeight: "600",
+          color: "#FFFFFF",
+          marginBottom: 4,
+     },
+     musicInfoText: {
+          fontSize: 14,
+          color: "#BBBBBB",
+          marginBottom: 2,
      },
      modalButtons: {
           flexDirection: "row",
@@ -597,6 +683,12 @@ const styles = StyleSheet.create({
           borderRadius: 8,
           alignItems: "center",
           marginLeft: 8,
+     },
+     closeButton: {
+          backgroundColor: "#555",
+          padding: 12,
+          borderRadius: 8,
+          alignItems: "center",
      },
      buttonText: {
           fontSize: 16,

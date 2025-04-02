@@ -15,10 +15,10 @@ interface AddWorkoutModalProps {
 export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit }: AddWorkoutModalProps) {
      const [selectedCategory, setSelectedCategory] = useState<string>("푸쉬업");
      const [name, setName] = useState<string>("");
-     const [duration, setDuration] = useState<string>("30");
+     const [duration, setDuration] = useState<string>("5");
      const [repeatCount, setRepeatCount] = useState<string>("12");
-     const [cycleCount, setCycleCount] = useState<string>("1");
-     const [prepTime, setPrepTime] = useState<string>("0");
+     const [cycleCount, setCycleCount] = useState<string>("4");
+     const [prepTime, setPrepTime] = useState<string>("2");
      const [preStartTime, setPreStartTime] = useState<string>("5");
      const [cycleRestTime, setCycleRestTime] = useState<string>("60");
      const [backgroundColor, setBackgroundColor] = useState<string>("#4CAF50");
@@ -39,10 +39,10 @@ export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit
                } else {
                     setSelectedCategory("푸쉬업");
                     setName("푸쉬업");
-                    setDuration("30");
+                    setDuration("4");
                     setRepeatCount("12");
-                    setCycleCount("1");
-                    setPrepTime("0");
+                    setCycleCount("3");
+                    setPrepTime("2");
                     setPreStartTime("5");
                     setCycleRestTime("60");
                     setBackgroundColor("#4CAF50");
@@ -100,6 +100,10 @@ export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit
                                    <Picker.Item label="스쿼트" value="스쿼트" />
                                    <Picker.Item label="풀업" value="풀업" />
                                    <Picker.Item label="윗몸일으키기" value="윗몸일으키기" />
+                                   <Picker.Item label="플랭크" value="플랭크" />
+                                   <Picker.Item label="인터벌" value="인터벌" />
+                                   <Picker.Item label="타바타" value="타바타" />
+                                   <Picker.Item label="스트레칭" value="스트레칭" />
                                    <Picker.Item label="그 외" value="그 외" />
                               </Picker>
                          </View>
