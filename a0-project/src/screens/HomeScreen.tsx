@@ -213,7 +213,12 @@ export default function HomeScreen({ navigation }: Props) {
                     <FlatList
                          data={workouts}
                          renderItem={({ item }) => (
-                              <WorkoutCard workout={item} onDelete={handleDeleteWorkout} onEdit={openEditModal} />
+                              <WorkoutCard
+                                   workout={item}
+                                   onDelete={handleDeleteWorkout}
+                                   onEdit={openEditModal}
+                                   onHistoryUpdate={loadHistoryStats}
+                              />
                          )}
                          keyExtractor={(item) => item.id}
                          contentContainerStyle={styles.listContent}

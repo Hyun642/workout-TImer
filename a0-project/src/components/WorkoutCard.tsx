@@ -15,14 +15,17 @@ interface WorkoutCardProps {
      workout: Workout;
      onDelete: (id: string) => void;
      onEdit: (workout: Workout) => void;
+     onHistoryUpdate: () => void;
 }
 
-const saveWorkoutHistory = async (historyItem: WorkoutHistory) => {
+const saveWorkoutHistory = async (historyItem: WorkoutHistory, onHistoryUpdate: () => void) => {
      try {
           const existingHistory = await AsyncStorage.getItem("workoutHistory");
           const historyArray: WorkoutHistory[] = existingHistory ? JSON.parse(existingHistory) : [];
           historyArray.push(historyItem);
           await AsyncStorage.setItem("workoutHistory", JSON.stringify(historyArray));
+          onHistoryUpdate();
+          logger.log("Workout history saved and stats updated");
      } catch (error) {
           logger.error("Error saving workout history:", error);
      }
@@ -31,7 +34,7 @@ const saveWorkoutHistory = async (historyItem: WorkoutHistory) => {
 type MusicTrackKey = "music1" | "music2" | "music3";
 type MusicTracks = Record<MusicTrackKey, number>;
 
-export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardProps) {
+export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate }: WorkoutCardProps) {
      const [isTimerActive, setIsTimerActive] = useState(false);
      const [repeatCount, setRepeatCount] = useState(0);
      const [setCount, setSetCount] = useState(1);
@@ -94,7 +97,6 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           };
      }, []);
 
-     // 배경 음악 로드
      useEffect(() => {
           const loadBackgroundMusic = async () => {
                setIsMusicLoading(true);
@@ -118,7 +120,6 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           loadBackgroundMusic();
      }, [selectedTrack]);
 
-     // 볼륨 업데이트
      useEffect(() => {
           const updateVolume = async () => {
                if (backgroundMusic) {
@@ -129,7 +130,6 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
           updateVolume();
      }, [volume, backgroundMusic]);
 
-     // 배경 음악 제어
      useEffect(() => {
           const controlMusic = async () => {
                if (isMusicLoading || !backgroundMusic) {
@@ -150,7 +150,6 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                }
           };
 
-          // 음악 제어 조건이 충족될 때만 실행
           if (backgroundMusic && !isMusicLoading) {
                controlMusic();
           }
@@ -215,7 +214,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     totalRepetitions: repeatCount,
                     completed: false,
                };
-               saveWorkoutHistory(historyItem);
+               saveWorkoutHistory(historyItem, onHistoryUpdate);
           }
 
           setIsTimerActive(false);
@@ -245,7 +244,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit }: WorkoutCardPr
                     totalRepetitions: finalRepeatCount,
                     completed: true,
                };
-               saveWorkoutHistory(historyItem);
+               saveWorkoutHistory(historyItem, onHistoryUpdate);
                playWorkoutEndSound();
           }
      };

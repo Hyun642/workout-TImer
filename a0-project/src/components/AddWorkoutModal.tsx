@@ -89,8 +89,6 @@ export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit
                <View style={styles.modalOverlay}>
                     <Animated.View style={[styles.modalContainer, { transform: [{ scale: modalScale }] }]}>
                          <Text style={styles.modalTitle}>{workoutToEdit ? "운동 수정" : "운동 추가"}</Text>
-
-                         {/* 첫 번째 문항: 운동 카테고리 선택 */}
                          <View style={styles.inputContainer}>
                               <Text style={styles.label}>운동 종류</Text>
                               <Picker
@@ -106,7 +104,6 @@ export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit
                               </Picker>
                          </View>
 
-                         {/* '그 외' 선택 시 이름 입력 필드 표시 */}
                          {selectedCategory === "그 외" && (
                               <View style={styles.inputContainer}>
                                    <Text style={styles.label}>운동 이름</Text>
@@ -120,7 +117,6 @@ export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit
                               </View>
                          )}
 
-                         {/* 두 번째 문항: 선택한 운동 이름 표시 */}
                          <View style={styles.inputContainer}>
                               <Text style={styles.label}>{name || "새 루틴"}</Text>
                               <TextInput
@@ -199,6 +195,36 @@ export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit
                               <Text style={styles.unit}>초</Text>
                          </View>
 
+                         <View style={styles.inputContainer}>
+                              <Text style={styles.label}>배경 색상</Text>
+                              <View style={styles.colorPicker}>
+                                   <Pressable
+                                        style={[
+                                             styles.colorButton,
+                                             { backgroundColor: "#4CAF50" },
+                                             backgroundColor === "#4CAF50" && styles.selectedColor,
+                                        ]}
+                                        onPress={() => setBackgroundColor("#4CAF50")}
+                                   />
+                                   <Pressable
+                                        style={[
+                                             styles.colorButton,
+                                             { backgroundColor: "#ad71f8" },
+                                             backgroundColor === "#ad71f8" && styles.selectedColor,
+                                        ]}
+                                        onPress={() => setBackgroundColor("#ad71f8")}
+                                   />
+                                   <Pressable
+                                        style={[
+                                             styles.colorButton,
+                                             { backgroundColor: "#0049f0" },
+                                             backgroundColor === "#0049f0" && styles.selectedColor,
+                                        ]}
+                                        onPress={() => setBackgroundColor("#0049f0")}
+                                   />
+                              </View>
+                         </View>
+
                          <View style={styles.buttonContainer}>
                               <Pressable style={styles.cancelButton} onPress={onClose}>
                                    <Text style={styles.buttonText}>취소</Text>
@@ -262,6 +288,21 @@ const styles = StyleSheet.create({
           fontSize: 16,
           color: "#BBBBBB",
           marginLeft: 8,
+     },
+     colorPicker: {
+          flexDirection: "row",
+          justifyContent: "flex-end",
+          width: 120,
+     },
+     colorButton: {
+          width: 30,
+          height: 30,
+          borderRadius: 15,
+          marginHorizontal: 5,
+     },
+     selectedColor: {
+          borderWidth: 2,
+          borderColor: "#FFFFFF",
      },
      buttonContainer: {
           flexDirection: "row",
