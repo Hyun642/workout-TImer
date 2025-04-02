@@ -58,7 +58,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                setWorkoutToEdit(null);
           } else {
                const workoutWithId = { ...newWorkout, id: uuidv4() };
-               const updatedWorkouts = [...workouts, workoutWithId];
+               const updatedWorkouts = [workoutWithId, ...workouts]; // 배열의 시작에 추가
                saveWorkouts(updatedWorkouts);
           }
           setIsAddModalVisible(false);
@@ -81,7 +81,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
      return (
           <View style={styles.container}>
                <View style={styles.header}>
-                    <Text style={styles.title}>운동 루틴</Text>
+                    <Text style={styles.title}>운동 루틴 🔥</Text>
                     <View style={styles.headerActions}>
                          <Pressable style={styles.historyButton} onPress={() => navigation.navigate("History")}>
                               <MaterialIcons name="history" size={28} color="#FFFFFF" />
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
      container: {
           flex: 1,
           backgroundColor: "#1C1C1C",
-          paddingTop: 20,
+          paddingTop: 10,
      },
      header: {
           flexDirection: "row",
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
      title: {
           fontSize: 28,
           fontWeight: "bold",
-          color: "#FFFFFF",
+          color: "#ffffff",
      },
      headerActions: {
           flexDirection: "row",

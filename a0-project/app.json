@@ -1,6 +1,7 @@
 {
      "expo": {
-          "name": "a0-project",
+          "name": "홈트타이머",
+          "description": "간단하고 빠른 홈트레이닝용 타이머 앱, 기록하고 통계를 확인하여 당신의 운동 습관을 확인하세요.",
           "slug": "snack-3ae235c3-be1c-40c6-983e-ae6f26879abb",
           "version": "1.0.0",
           "orientation": "portrait",
@@ -26,7 +27,6 @@
           "web": {
                "favicon": "./src/assetss/favicon.png"
           },
-          "description": "Quickly generate React Native components with AI",
           "extra": {
                "eas": {
                     "projectId": "248dffe1-78ea-4909-898c-51856ef7597c"

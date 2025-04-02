@@ -104,6 +104,7 @@ export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit
                                    <Picker.Item label="인터벌" value="인터벌" />
                                    <Picker.Item label="타바타" value="타바타" />
                                    <Picker.Item label="스트레칭" value="스트레칭" />
+                                   <Picker.Item label="공부" value="공부" />
                                    <Picker.Item label="그 외" value="그 외" />
                               </Picker>
                          </View>
@@ -117,6 +118,7 @@ export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit
                                         onChangeText={setName}
                                         placeholder="운동 이름을 입력하세요"
                                         placeholderTextColor="#888"
+                                        maxLength={13}
                                    />
                               </View>
                          )}
