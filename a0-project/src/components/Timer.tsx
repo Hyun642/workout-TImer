@@ -38,6 +38,7 @@ export default function Timer({
      const [restEndSound, setRestEndSound] = useState<Audio.Sound | null>(null);
      const [setEndSound, setSetEndSound] = useState<Audio.Sound | null>(null);
 
+     // 사운드 로드
      useEffect(() => {
           const loadSounds = async () => {
                try {
@@ -62,6 +63,7 @@ export default function Timer({
           };
      }, []);
 
+     // 타이머 초기화
      useEffect(() => {
           if (!isActive) {
                setTimeLeft(duration);
@@ -74,24 +76,15 @@ export default function Timer({
           }
      }, [isActive, duration, preStartTime, prepTime, cycleRestTime]);
 
-     useEffect(() => {
-          if (isPreStarting) {
-               setPreStartTimeLeft(preStartTime);
-          }
-     }, [isPreStarting, preStartTime]);
-
+     // isResting이 true일 때 prepTimeLeft 초기화
      useEffect(() => {
           if (isResting) {
                setPrepTimeLeft(prepTime);
+               logger.log(`Rest started with prepTimeLeft initialized to ${prepTime}`);
           }
      }, [isResting, prepTime]);
 
-     useEffect(() => {
-          if (isCycleResting) {
-               setCycleRestTimeLeft(cycleRestTime);
-          }
-     }, [isCycleResting, cycleRestTime]);
-
+     // Pre-start 타이머
      useEffect(() => {
           let interval: NodeJS.Timeout | null = null;
           if (isActive && !isPaused && isPreStarting && preStartTimeLeft > 0) {
@@ -113,53 +106,65 @@ export default function Timer({
           };
      }, [isActive, isPaused, isPreStarting, preStartTimeLeft, restEndSound]);
 
+     // Cycle rest 타이머
      useEffect(() => {
           let interval: NodeJS.Timeout | null = null;
           if (isActive && !isPaused && isCycleResting && cycleRestTimeLeft > 0) {
                interval = setInterval(() => {
-                    setCycleRestTimeLeft((prev) => (prev > 1 ? prev - 1 : 0));
+                    setCycleRestTimeLeft((prev) => {
+                         const next = prev - 1;
+                         if (next <= 0) {
+                              if (restEndSound) {
+                                   restEndSound.replayAsync().then(() => logger.log("Cycle rest end sound played"));
+                              }
+                              onCycleRestComplete();
+                              return 0;
+                         }
+                         return next;
+                    });
                }, 1000);
           }
           return () => {
                if (interval) clearInterval(interval);
           };
-     }, [isActive, isPaused, isCycleResting, cycleRestTimeLeft]);
+     }, [isActive, isPaused, isCycleResting, cycleRestTimeLeft, onCycleRestComplete, restEndSound]);
 
-     useEffect(() => {
-          if (isCycleResting && cycleRestTimeLeft <= 0) {
-               if (restEndSound) {
-                    restEndSound.replayAsync().then(() => logger.log("Cycle rest end sound played"));
-               }
-               onCycleRestComplete();
-          }
-     }, [isCycleResting, cycleRestTimeLeft, onCycleRestComplete, restEndSound]);
-
+     // Rest 타이머
      useEffect(() => {
           let interval: NodeJS.Timeout | null = null;
           if (isActive && !isPaused && isResting && prepTimeLeft > 0) {
                interval = setInterval(() => {
-                    setPrepTimeLeft((prev) => (prev > 1 ? prev - 1 : 0));
+                    setPrepTimeLeft((prev) => {
+                         const next = prev - 1;
+                         if (next <= 0) {
+                              setIsResting(false);
+                              if (restEndSound) {
+                                   restEndSound.replayAsync().then(() => logger.log("Rest end sound played"));
+                              }
+                              return 0;
+                         }
+                         return next;
+                    });
                }, 1000);
           }
           return () => {
                if (interval) clearInterval(interval);
           };
-     }, [isActive, isPaused, isResting, prepTimeLeft]);
+     }, [isActive, isPaused, isResting, prepTimeLeft, restEndSound]);
 
-     useEffect(() => {
-          if (isResting && prepTimeLeft <= 0) {
-               setIsResting(false);
-               if (restEndSound) {
-                    restEndSound.replayAsync().then(() => logger.log("Rest end sound played"));
-               }
-          }
-     }, [isResting, prepTimeLeft, restEndSound]);
-
+     // Main 타이머
      useEffect(() => {
           let interval: NodeJS.Timeout | null = null;
           if (isActive && !isPaused && !isPreStarting && !isCycleResting && !isResting && timeLeft > 0) {
                interval = setInterval(() => {
-                    setTimeLeft((prev) => (prev > 1 ? prev - 1 : 0));
+                    setTimeLeft((prev) => {
+                         const next = prev - 1;
+                         if (next <= 0) {
+                              setShouldComplete(true);
+                              return 0;
+                         }
+                         return next;
+                    });
                }, 1000);
           }
           return () => {
@@ -167,12 +172,7 @@ export default function Timer({
           };
      }, [isActive, isPaused, isPreStarting, isCycleResting, isResting, timeLeft]);
 
-     useEffect(() => {
-          if (isActive && !isPaused && !isPreStarting && !isCycleResting && !isResting && timeLeft <= 0) {
-               setShouldComplete(true);
-          }
-     }, [isActive, isPaused, isPreStarting, isCycleResting, isResting, timeLeft]);
-
+     // onComplete 처리
      useEffect(() => {
           if (shouldComplete) {
                onComplete();
@@ -180,6 +180,7 @@ export default function Timer({
                setTimeLeft(duration);
                if (prepTime > 0) {
                     setIsResting(true);
+                    logger.log("Exercise completed, entering rest period");
                }
                if (setEndSound) {
                     setEndSound.replayAsync().then(() => logger.log("Set end sound played"));
