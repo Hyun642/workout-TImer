@@ -14,6 +14,7 @@ interface TimerProps {
      isCycleResting: boolean;
      onCycleRestComplete: () => void;
      workoutName: string;
+     isLastRepetition?: boolean; // 추가: 마지막 횟수 여부를 전달받음
 }
 
 export default function Timer({
@@ -27,6 +28,7 @@ export default function Timer({
      isCycleResting,
      onCycleRestComplete,
      workoutName,
+     isLastRepetition = false, // 기본값 false
 }: TimerProps) {
      const [timeLeft, setTimeLeft] = useState(duration);
      const [preStartTimeLeft, setPreStartTimeLeft] = useState(preStartTime);
@@ -35,6 +37,7 @@ export default function Timer({
      const [isPreStarting, setIsPreStarting] = useState(true);
      const [isResting, setIsResting] = useState(false);
      const [shouldComplete, setShouldComplete] = useState(false);
+     const [shouldCycleRestComplete, setShouldCycleRestComplete] = useState(false);
      const [restEndSound, setRestEndSound] = useState<Audio.Sound | null>(null);
      const [setEndSound, setSetEndSound] = useState<Audio.Sound | null>(null);
 
@@ -73,6 +76,8 @@ export default function Timer({
                setIsPreStarting(true);
                setIsResting(false);
                setShouldComplete(false);
+               setShouldCycleRestComplete(false);
+               logger.log("Timer reset: All states initialized");
           }
      }, [isActive, duration, preStartTime, prepTime, cycleRestTime]);
 
@@ -83,6 +88,15 @@ export default function Timer({
                logger.log(`Rest started with prepTimeLeft initialized to ${prepTime}`);
           }
      }, [isResting, prepTime]);
+
+     // isCycleResting이 true일 때 cycleRestTimeLeft 초기화
+     useEffect(() => {
+          if (isCycleResting) {
+               setCycleRestTimeLeft(cycleRestTime);
+               setShouldCycleRestComplete(false);
+               logger.log(`Cycle rest started with cycleRestTimeLeft initialized to ${cycleRestTime}`);
+          }
+     }, [isCycleResting, cycleRestTime]);
 
      // Pre-start 타이머
      useEffect(() => {
@@ -110,14 +124,14 @@ export default function Timer({
      useEffect(() => {
           let interval: NodeJS.Timeout | null = null;
           if (isActive && !isPaused && isCycleResting && cycleRestTimeLeft > 0) {
+               logger.log(`Cycle rest timer started with cycleRestTimeLeft: ${cycleRestTimeLeft}`);
                interval = setInterval(() => {
                     setCycleRestTimeLeft((prev) => {
                          const next = prev - 1;
+                         logger.log(`Cycle rest time left: ${next}`);
                          if (next <= 0) {
-                              if (restEndSound) {
-                                   restEndSound.replayAsync().then(() => logger.log("Cycle rest end sound played"));
-                              }
-                              onCycleRestComplete();
+                              logger.log("Cycle rest time reached 0, setting shouldCycleRestComplete to true");
+                              setShouldCycleRestComplete(true);
                               return 0;
                          }
                          return next;
@@ -127,7 +141,19 @@ export default function Timer({
           return () => {
                if (interval) clearInterval(interval);
           };
-     }, [isActive, isPaused, isCycleResting, cycleRestTimeLeft, onCycleRestComplete, restEndSound]);
+     }, [isActive, isPaused, isCycleResting, cycleRestTimeLeft]);
+
+     // Cycle rest 완료 처리
+     useEffect(() => {
+          if (shouldCycleRestComplete) {
+               if (restEndSound) {
+                    restEndSound.replayAsync().then(() => logger.log("Cycle rest end sound played"));
+               }
+               onCycleRestComplete();
+               setShouldCycleRestComplete(false);
+               logger.log("Cycle rest completed, onCycleRestComplete called");
+          }
+     }, [shouldCycleRestComplete, onCycleRestComplete, restEndSound]);
 
      // Rest 타이머
      useEffect(() => {
@@ -161,7 +187,7 @@ export default function Timer({
                          const next = prev - 1;
                          if (next <= 0) {
                               setShouldComplete(true);
-                              return 0;
+                              return duration;
                          }
                          return next;
                     });
@@ -177,16 +203,17 @@ export default function Timer({
           if (shouldComplete) {
                onComplete();
                setShouldComplete(false);
-               setTimeLeft(duration);
-               if (prepTime > 0) {
+               if (prepTime > 0 && !isLastRepetition) {
                     setIsResting(true);
-                    logger.log("Exercise completed, entering rest period");
+                    logger.log(`[${workoutName}] Exercise completed, entering rest period (prepTime: ${prepTime}s)`);
+               } else if (isLastRepetition) {
+                    logger.log(`[${workoutName}] Last repetition of set, skipping prepTime`);
                }
                if (setEndSound) {
                     setEndSound.replayAsync().then(() => logger.log("Set end sound played"));
                }
           }
-     }, [shouldComplete, onComplete, prepTime, duration, setEndSound]);
+     }, [shouldComplete, onComplete, prepTime, duration, setEndSound, isLastRepetition, workoutName]);
 
      const formatTime = (seconds: number) => {
           const mins = Math.floor(seconds / 60);

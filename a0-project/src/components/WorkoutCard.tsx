@@ -50,7 +50,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      const [selectedTrack, setSelectedTrack] = useState<MusicTrackKey>("music1");
      const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
      const [isResetModalVisible, setIsResetModalVisible] = useState(false);
-     const [isMusicInfoModalVisible, setIsMusicInfoModalVisible] = useState(false); // 음악 출처 모달 상태
+     const [isMusicInfoModalVisible, setIsMusicInfoModalVisible] = useState(false);
      const [modalScale] = useState(new Animated.Value(0));
      const [volume, setVolume] = useState(0.2);
 
@@ -230,6 +230,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                handleReset();
           } else if (isTimerActive) {
                setIsPaused(!isPaused);
+               logger.log(`Timer ${isPaused ? "resumed" : "paused"}`);
           }
      };
 
@@ -259,7 +260,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
           setIsCycleResting(false);
           setStartTime(null);
           setTotalTime(0);
-          logger.log("Timer reset");
+          logger.log("Timer reset: All states cleared");
      };
 
      const celebrateCompletion = (finalRepeatCount: number) => {
@@ -280,31 +281,55 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                };
                saveWorkoutHistory(historyItem, onHistoryUpdate);
                playWorkoutEndSound();
+               logger.log("Workout completed, history saved");
           }
      };
 
      const handleComplete = () => {
           setRepeatCount((prev) => {
                const newCount = prev + 1;
-               if (workout.repeatCount !== 0 && newCount >= workout.repeatCount) {
+               const isLastRepOfSet = workout.repeatCount !== 0 && newCount >= workout.repeatCount;
+
+               logger.log(`handleComplete called: repeatCount=${newCount}, isLastRepOfSet=${isLastRepOfSet}`);
+
+               if (isLastRepOfSet) {
                     setSetCount((prevSet) => {
                          const newSetCount = prevSet + 1;
-                         if (workout.cycleCount !== 0 && newSetCount > workout.cycleCount) {
+                         const isLastSet = workout.cycleCount !== 0 && newSetCount > workout.cycleCount;
+
+                         logger.log(`Set completed: setCount=${newSetCount}, isLastSet=${isLastSet}`);
+
+                         if (isLastSet) {
                               setIsTimerActive(false);
                               setIsPaused(false);
                               setIsCycleResting(false);
                               celebrateCompletion(newCount);
+                              logger.log("Workout completed, all sets finished");
                               return prevSet;
                          }
-                         setIsCycleResting(true);
+
+                         if (workout.cycleRestTime > 0) {
+                              setIsCycleResting(true);
+                              logger.log(
+                                   `Entering cycle rest for set ${newSetCount}, cycleRestTime=${workout.cycleRestTime}`
+                              );
+                         } else {
+                              logger.log("Cycle rest time is 0, skipping cycle rest");
+                              setIsTimerActive(true);
+                              setIsPaused(false);
+                         }
+
                          return newSetCount;
                     });
                     return 0;
                }
+
                if (workout.repeatCount === 0 || newCount < workout.repeatCount) {
                     setIsTimerActive(true);
                     setIsPaused(false);
+                    logger.log("Continuing to next repetition");
                }
+
                return newCount;
           });
      };
@@ -313,6 +338,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
           setIsCycleResting(false);
           setIsTimerActive(true);
           setIsPaused(false);
+          logger.log("Cycle rest completed, resuming timer for next set");
      };
 
      const handleDeleteConfirm = async () => {
@@ -340,6 +366,8 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                                    : isPaused
                                    ? "#FA4E4C"
                                    : workout.backgroundColor,
+                              shadowColor: isTimerActive && !isPaused ? "#00FF00" : "#000",
+                              shadowOpacity: isTimerActive && !isPaused ? 0.8 : 0.3,
                          },
                     ]}
                >
@@ -347,6 +375,16 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                          <View style={styles.header}>
                               <Text style={styles.title}>{workout.name}</Text>
                               <View style={styles.actions}>
+                                   {isTimerActive && !isPaused ? (
+                                        <MaterialIcons name="pause" size={24} color="white" style={styles.statusIcon} />
+                                   ) : isTimerActive && isPaused ? (
+                                        <MaterialIcons
+                                             name="play-arrow"
+                                             size={24}
+                                             color="white"
+                                             style={styles.statusIcon}
+                                        />
+                                   ) : null}
                                    <Pressable
                                         onPress={() => {
                                              logger.log("Editing workout:", workout);
@@ -354,10 +392,10 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                                         }}
                                         style={styles.actionButton}
                                    >
-                                        <MaterialCommunityIcons name="pencil" size={24} color="lightgray" />
+                                        <MaterialCommunityIcons name="pencil" size={24} color="white" />
                                    </Pressable>
                                    <Pressable onPress={() => setIsDeleteModalVisible(true)} style={styles.actionButton}>
-                                        <MaterialCommunityIcons name="delete" size={24} color="lightgray" />
+                                        <MaterialCommunityIcons name="delete" size={24} color="white" />
                                    </Pressable>
                               </View>
                          </View>
@@ -372,6 +410,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                               isCycleResting={isCycleResting}
                               onCycleRestComplete={handleCycleRestComplete}
                               workoutName={workout.name}
+                              isLastRepetition={workout.repeatCount !== 0 && repeatCount === workout.repeatCount - 1} // 마지막 횟수 여부
                          />
                          <View style={styles.footer}>
                               <View>
@@ -513,9 +552,7 @@ const styles = StyleSheet.create({
           borderRadius: 30,
           padding: 20,
           marginBottom: 16,
-          shadowColor: "#000",
           shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
           shadowRadius: 8,
           elevation: 5,
           width: "100%",
@@ -536,10 +573,14 @@ const styles = StyleSheet.create({
      },
      actions: {
           flexDirection: "row",
+          alignItems: "center",
      },
      actionButton: {
           marginLeft: 16,
           padding: 8,
+     },
+     statusIcon: {
+          marginLeft: 16,
      },
      footer: {
           marginTop: 16,
