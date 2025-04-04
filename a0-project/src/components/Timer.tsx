@@ -259,22 +259,26 @@ const styles = StyleSheet.create({
      },
      label: {
           fontSize: 18,
-          color: "#BBBBBB",
+          color: "#ffffff",
+          fontWeight: "bold",
           marginBottom: 8,
      },
      labelPreStart: {
           fontSize: 18,
           color: "#FFD700",
+          fontWeight: "bold",
           marginBottom: 8,
      },
      labelRest: {
           fontSize: 18,
           color: "#00FF00",
+          fontWeight: "bold",
           marginBottom: 8,
      },
      labelCycleRest: {
           fontSize: 18,
           color: "#FF69B4",
+          fontWeight: "bold",
           marginBottom: 8,
      },
      time: {

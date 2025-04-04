@@ -376,12 +376,17 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                               <Text style={styles.title}>{workout.name}</Text>
                               <View style={styles.actions}>
                                    {isTimerActive && !isPaused ? (
-                                        <MaterialIcons name="pause" size={24} color="white" style={styles.statusIcon} />
+                                        <MaterialIcons
+                                             name="pause"
+                                             size={24}
+                                             color="#ffffff"
+                                             style={styles.statusIcon}
+                                        />
                                    ) : isTimerActive && isPaused ? (
                                         <MaterialIcons
                                              name="play-arrow"
                                              size={24}
-                                             color="white"
+                                             color="#ffffff"
                                              style={styles.statusIcon}
                                         />
                                    ) : null}
@@ -392,10 +397,10 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                                         }}
                                         style={styles.actionButton}
                                    >
-                                        <MaterialCommunityIcons name="pencil" size={24} color="white" />
+                                        <MaterialCommunityIcons name="pencil" size={24} color="#ffffff" />
                                    </Pressable>
                                    <Pressable onPress={() => setIsDeleteModalVisible(true)} style={styles.actionButton}>
-                                        <MaterialCommunityIcons name="delete" size={24} color="white" />
+                                        <MaterialCommunityIcons name="delete" size={24} color="#ffffff" />
                                    </Pressable>
                               </View>
                          </View>
@@ -590,12 +595,12 @@ const styles = StyleSheet.create({
      },
      repeatText: {
           fontSize: 18,
-          color: "lightgray",
+          color: "#ffffff",
           fontWeight: "500",
      },
      setText: {
           fontSize: 18,
-          color: "lightgray",
+          color: "#ffffff",
           fontWeight: "500",
           marginTop: 4,
      },
@@ -633,6 +638,7 @@ const styles = StyleSheet.create({
      },
      musicLabel: {
           fontSize: 16,
+          fontWeight: 600,
           color: "#FFFFFF",
      },
      musicPickerContainer: {
