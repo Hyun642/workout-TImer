@@ -84,10 +84,10 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                     <Text style={styles.title}>운동 루틴 🔥</Text>
                     <View style={styles.headerActions}>
                          <Pressable style={styles.historyButton} onPress={() => navigation.navigate("History")}>
-                              <MaterialIcons name="history" size={28} color="#FFFFFF" />
+                              <MaterialIcons name="history" size={28} color="lightgray" />
                          </Pressable>
                          <Pressable style={styles.statsButton} onPress={() => setIsStatsModalVisible(true)}>
-                              <MaterialIcons name="bar-chart" size={28} color="#FFFFFF" />
+                              <MaterialIcons name="bar-chart" size={28} color="lightgray" />
                          </Pressable>
                          <Pressable
                               style={styles.addButton}
@@ -96,7 +96,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                                    setIsAddModalVisible(true);
                               }}
                          >
-                              <MaterialIcons name="add" size={28} color="#FFFFFF" />
+                              <MaterialIcons name="add" size={28} color="lightgray" />
                          </Pressable>
                     </View>
                </View>
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
      title: {
           fontSize: 28,
           fontWeight: "bold",
-          color: "#ffffff",
+          color: "#fcfcfc",
      },
      headerActions: {
           flexDirection: "row",

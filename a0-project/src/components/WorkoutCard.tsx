@@ -83,13 +83,13 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
           },
           "휴식 종료": {
                provider: "셀바이뮤직",
-               title: "Pop up 3",
+               title: "Di-Ding 4",
                url: "https://sellbuymusic.com/md/seyqcbb-dfczzbz",
           },
           "세트 종료": {
                provider: "셀바이뮤직",
-               title: "Blop Sound",
-               url: "https://sellbuymusic.com/md/sejnxkz-jfczzbz",
+               title: "Error 2",
+               url: "https://sellbuymusic.com/md/suunfxz-yfczzbz",
           },
      };
 
@@ -364,7 +364,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                               backgroundColor: isCompleted
                                    ? "rgba(33, 150, 243, 0.9)"
                                    : isPaused
-                                   ? "#FA4E4C"
+                                   ? "#e65045"
                                    : workout.backgroundColor,
                               shadowColor: isTimerActive && !isPaused ? "#00FF00" : "#000",
                               shadowOpacity: isTimerActive && !isPaused ? 0.8 : 0.3,
