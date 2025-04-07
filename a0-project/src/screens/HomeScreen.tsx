@@ -102,7 +102,17 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                </View>
                <ScrollView contentContainerStyle={styles.scrollContainer}>
                     {workouts.length === 0 ? (
-                         <Text style={styles.emptyText}>운동 루틴을 추가해보세요!</Text>
+                         <View
+                              style={{
+                                   display: "flex",
+                                   justifyContent: "center",
+                                   alignItems: "center",
+                                   marginTop: 40,
+                              }}
+                         >
+                              <Text style={styles.emptyText}> + 버튼을 눌러 </Text>
+                              <Text style={styles.emptyText}> 운동 루틴을 추가해보세요!</Text>
+                         </View>
                     ) : (
                          workouts.map((workout) => (
                               <WorkoutCard
@@ -166,11 +176,13 @@ const styles = StyleSheet.create({
      scrollContainer: {
           paddingHorizontal: 20,
           paddingBottom: 20,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
      },
      emptyText: {
           fontSize: 18,
           color: "#BBBBBB",
           textAlign: "center",
-          marginTop: 40,
      },
 });

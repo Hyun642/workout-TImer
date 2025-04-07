@@ -12,7 +12,7 @@
           "splash": {
                "image": "./src/assets/splash-icon.png",
                "resizeMode": "contain",
-               "backgroundColor": "#ffffff"
+               "backgroundColor": "#f0f0ee"
           },
           "ios": {
                "supportsTablet": true
@@ -25,7 +25,7 @@
                "package": "com.hyunnnnn.snack3ae235c3be1c40c6983eae6f26879abb"
           },
           "web": {
-               "favicon": "./src/assetss/favicon.png"
+               "favicon": "./src/assets/favicon.png"
           },
           "extra": {
                "eas": {
