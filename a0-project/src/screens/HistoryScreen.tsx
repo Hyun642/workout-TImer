@@ -28,12 +28,9 @@ export default function HistoryScreen() {
      };
 
      const groupHistoryByDate = (history: WorkoutHistory[]) => {
+          // 날짜별로 그룹화 (YYYY-MM-DD 형식으로 그룹화)
           const grouped = history.reduce((acc, record) => {
-               const date = new Date(record.startTime).toLocaleDateString("ko-KR", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-               });
+               const date = new Date(record.startTime).toISOString().split("T")[0]; // YYYY-MM-DD 형식
                if (!acc[date]) {
                     acc[date] = [];
                }
@@ -41,17 +38,23 @@ export default function HistoryScreen() {
                return acc;
           }, {} as { [key: string]: WorkoutHistory[] });
 
+          // 날짜를 최신순으로 정렬
           const sortedGrouped = Object.keys(grouped)
-               .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+               .sort((a, b) => new Date(b).getTime() - new Date(a).getTime()) // 최신 날짜가 맨 위로
                .map((date) => ({
-                    date,
+                    date: new Date(date).toLocaleDateString("ko-KR", {
+                         year: "numeric",
+                         month: "long",
+                         day: "numeric",
+                    }), // 표시용 날짜 형식
                     records: grouped[date].sort(
                          (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-                    ),
+                    ), // 각 날짜 내 기록도 최신순으로 정렬
                }));
 
           setGroupedHistory(sortedGrouped);
 
+          // 초기 확장 상태 설정
           const initialExpandedState = sortedGrouped.reduce((acc, group) => {
                acc[group.date] = false;
                return acc;
