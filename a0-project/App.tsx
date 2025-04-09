@@ -27,7 +27,7 @@ export default function App() {
                          <Stack.Screen
                               name="Home"
                               component={HomeScreen}
-                              options={{ title: "HOME TRAINING TIMER", headerShown: true }}
+                              options={{ title: "HOME WORKOUT TIMER", headerShown: true }}
                          />
                          <Stack.Screen name="History" component={HistoryScreen} options={{ title: "운동 기록" }} />
                     </Stack.Navigator>
