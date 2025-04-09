@@ -1,4 +1,7 @@
 {
+     "cli": {
+          "appVersionSource": "local"
+     },
      "expo": {
           "name": "홈트타이머",
           "description": "간단하고 빠른 홈트레이닝용 타이머 앱, 기록하고 통계를 확인하여 당신의 운동 습관을 확인하세요.",

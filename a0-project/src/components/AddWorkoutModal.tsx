@@ -125,80 +125,98 @@ export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit
 
                          <View style={styles.inputContainer}>
                               <Text style={styles.label}>{name || "새 루틴"}</Text>
-                              <TextInput
-                                   style={styles.input}
-                                   value={duration}
-                                   onChangeText={setDuration}
-                                   keyboardType="numeric"
-                                   placeholder="30"
-                                   placeholderTextColor="#888"
-                              />
-                              <Text style={styles.unit}>초</Text>
+                              <View style={styles.inputWrapper}>
+                                   <Text style={styles.unit}>회 당 </Text>
+                                   <TextInput
+                                        style={styles.input}
+                                        value={duration}
+                                        onChangeText={setDuration}
+                                        keyboardType="numeric"
+                                        placeholder="30"
+                                        placeholderTextColor="#888"
+                                   />
+                                   <Text style={styles.unit}> 초</Text>
+                              </View>
                          </View>
 
                          <View style={styles.inputContainer}>
                               <Text style={styles.label}>횟수</Text>
-                              <TextInput
-                                   style={styles.input}
-                                   value={repeatCount}
-                                   onChangeText={setRepeatCount}
-                                   keyboardType="numeric"
-                                   placeholder="12"
-                                   placeholderTextColor="#888"
-                              />
-                              <Text style={styles.unit}>회</Text>
+                              <View style={styles.inputWrapper}>
+                                   <Text style={styles.unit}>한 세트 </Text>
+                                   <TextInput
+                                        style={styles.input}
+                                        value={repeatCount}
+                                        onChangeText={setRepeatCount}
+                                        keyboardType="numeric"
+                                        placeholder="12"
+                                        placeholderTextColor="#888"
+                                   />
+                                   <Text style={styles.unit}> 회</Text>
+                              </View>
                          </View>
 
                          <View style={styles.inputContainer}>
                               <Text style={styles.label}>세트</Text>
-                              <TextInput
-                                   style={styles.input}
-                                   value={cycleCount}
-                                   onChangeText={setCycleCount}
-                                   keyboardType="numeric"
-                                   placeholder="1"
-                                   placeholderTextColor="#888"
-                              />
-                              <Text style={styles.unit}>세트</Text>
+                              <View style={styles.inputWrapper}>
+                                   <Text style={styles.unit}>총 </Text>
+                                   <TextInput
+                                        style={styles.input}
+                                        value={cycleCount}
+                                        onChangeText={setCycleCount}
+                                        keyboardType="numeric"
+                                        placeholder="1"
+                                        placeholderTextColor="#888"
+                                   />
+                                   <Text style={styles.unit}> 세트</Text>
+                              </View>
                          </View>
 
                          <View style={styles.inputContainer}>
                               <Text style={styles.label}>1회 당 휴식 시간</Text>
-                              <TextInput
-                                   style={styles.input}
-                                   value={prepTime}
-                                   onChangeText={setPrepTime}
-                                   keyboardType="numeric"
-                                   placeholder="0"
-                                   placeholderTextColor="#888"
-                              />
-                              <Text style={styles.unit}>초</Text>
+                              <View style={styles.inputWrapper}>
+                                   <Text style={styles.unit}>회 당 </Text>
+                                   <TextInput
+                                        style={styles.input}
+                                        value={prepTime}
+                                        onChangeText={setPrepTime}
+                                        keyboardType="numeric"
+                                        placeholder="0"
+                                        placeholderTextColor="#888"
+                                   />
+                                   <Text style={styles.unit}> 초</Text>
+                              </View>
                          </View>
 
                          <View style={styles.inputContainer}>
                               <Text style={styles.label}>시작 전 준비 시간</Text>
-                              <TextInput
-                                   style={styles.input}
-                                   value={preStartTime}
-                                   onChangeText={setPreStartTime}
-                                   keyboardType="numeric"
-                                   placeholder="5"
-                                   placeholderTextColor="#888"
-                              />
-                              <Text style={styles.unit}>초</Text>
+                              <View style={styles.inputWrapper}>
+                                   <Text style={styles.unit}>시작 전 </Text>
+                                   <TextInput
+                                        style={styles.input}
+                                        value={preStartTime}
+                                        onChangeText={setPreStartTime}
+                                        keyboardType="numeric"
+                                        placeholder="5"
+                                        placeholderTextColor="#888"
+                                   />
+                                   <Text style={styles.unit}> 초</Text>
+                              </View>
                          </View>
 
                          <View style={styles.inputContainer}>
                               <Text style={styles.label}>세트 간 휴식 시간</Text>
-                              <TextInput
-                                   style={styles.input}
-                                   value={cycleRestTime}
-                                   onChangeText={setCycleRestTime}
-                                   keyboardType="numeric"
-                                   placeholder="60"
-                                   placeholderTextColor="#888"
-                              />
-                              <Text style={styles.unit}>초</Text>
+                              <View style={styles.inputWrapper}>
+                                   <Text style={styles.unit}>세트 간 </Text>
+                                   <TextInput
+                                        style={styles.input}
+                                        value={cycleRestTime}
+                                        onChangeText={setCycleRestTime}
+                                        keyboardType="numeric"
+                                        placeholder="60"
+                                        placeholderTextColor="#888"
+                                   />
+                                   <Text style={styles.unit}> 초</Text>
+                              </View>
                          </View>
 
                          <View style={styles.inputContainer}>
@@ -276,6 +294,10 @@ const styles = StyleSheet.create({
           color: "#FFFFFF",
           flex: 1,
      },
+     inputWrapper: {
+          flexDirection: "row",
+          alignItems: "center",
+     },
      input: {
           backgroundColor: "#3C3C3C",
           color: "#FFFFFF",
@@ -293,7 +315,7 @@ const styles = StyleSheet.create({
      unit: {
           fontSize: 16,
           color: "#BBBBBB",
-          marginLeft: 8,
+          marginHorizontal: 4,
      },
      colorPicker: {
           flexDirection: "row",
