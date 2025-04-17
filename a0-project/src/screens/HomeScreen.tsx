@@ -110,7 +110,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                                         setIsAddModalVisible(true);
                                    }}
                               >
-                                   <MaterialIcons name="add" size={40} color="black" />
+                                   <MaterialIcons name="add" size={40} color="#1C1C1C" />
                               </Pressable>
                               <Text style={styles.emptyText}> 상단 + 버튼을 눌러</Text>
                               <Text style={styles.emptyText}> 운동 루틴을 추가해보세요!</Text>
@@ -189,10 +189,10 @@ const styles = StyleSheet.create({
           marginTop: 40,
      },
      largeAddButton: {
-          width: 80,
-          height: 80,
+          width: 60,
+          height: 60,
           borderRadius: 40,
-          backgroundColor: "white",
+          backgroundColor: "lightgray",
           justifyContent: "center",
           alignItems: "center",
           marginBottom: 20,
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
      },
      emptyText: {
           fontSize: 18,
-          color: "#BBBBBB",
+          color: "#ffffff",
           textAlign: "center",
      },
 });
