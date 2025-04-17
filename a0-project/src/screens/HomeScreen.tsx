@@ -189,8 +189,8 @@ const styles = StyleSheet.create({
           marginTop: 40,
      },
      largeAddButton: {
-          width: 60,
-          height: 60,
+          width: 65,
+          height: 65,
           borderRadius: 40,
           backgroundColor: "lightgray",
           justifyContent: "center",
