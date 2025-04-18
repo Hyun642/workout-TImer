@@ -101,31 +101,28 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                     </View>
                </View>
                <ScrollView contentContainerStyle={styles.scrollContainer}>
-                    {workouts.length === 0 ? (
-                         <View style={styles.emptyContainer}>
-                              <Pressable
-                                   style={styles.largeAddButton}
-                                   onPress={() => {
-                                        setWorkoutToEdit(null);
-                                        setIsAddModalVisible(true);
-                                   }}
-                              >
-                                   <MaterialIcons name="add" size={40} color="#1C1C1C" />
-                              </Pressable>
-                              <Text style={styles.emptyText}> 상단 + 버튼을 눌러</Text>
-                              <Text style={styles.emptyText}> 운동 루틴을 추가해보세요!</Text>
-                         </View>
-                    ) : (
-                         workouts.map((workout) => (
-                              <WorkoutCard
-                                   key={workout.id}
-                                   workout={workout}
-                                   onDelete={handleDeleteWorkout}
-                                   onEdit={handleEditWorkout}
-                                   onHistoryUpdate={handleHistoryUpdate}
-                              />
-                         ))
-                    )}
+                    {workouts.map((workout) => (
+                         <WorkoutCard
+                              key={workout.id}
+                              workout={workout}
+                              onDelete={handleDeleteWorkout}
+                              onEdit={handleEditWorkout}
+                              onHistoryUpdate={handleHistoryUpdate}
+                         />
+                    ))}
+                    <View style={styles.emptyContainer}>
+                         <Pressable
+                              style={styles.largeAddButton}
+                              onPress={() => {
+                                   setWorkoutToEdit(null);
+                                   setIsAddModalVisible(true);
+                              }}
+                         >
+                              <MaterialIcons name="add" size={48} color="lightgray" />
+                         </Pressable>
+                         <Text style={styles.emptyText}> 상단 '+' 버튼을 눌러</Text>
+                         <Text style={styles.emptyText}> 운동 루틴을 추가해보세요!</Text>
+                    </View>
                </ScrollView>
 
                <AddWorkoutModal
@@ -189,13 +186,13 @@ const styles = StyleSheet.create({
           marginTop: 40,
      },
      largeAddButton: {
-          width: 65,
+          width: 110,
           height: 65,
-          borderRadius: 40,
-          backgroundColor: "lightgray",
+          // borderRadius: 40,
+          backgroundColor: "#1c1c1c",
           justifyContent: "center",
           alignItems: "center",
-          marginBottom: 20,
+          marginBottom: 5,
           elevation: 5, // Android 그림자 효과
           shadowColor: "#000", // iOS 그림자 효과
           shadowOffset: { width: 0, height: 2 },
