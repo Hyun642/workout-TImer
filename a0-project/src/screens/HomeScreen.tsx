@@ -13,6 +13,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 type RootStackParamList = {
      Home: undefined;
      History: undefined;
+     Settings: undefined;
 };
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
