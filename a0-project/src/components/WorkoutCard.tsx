@@ -10,6 +10,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { v4 as uuidv4 } from "uuid";
 import { Audio } from "expo-av";
 import logger from "../utils/logger";
+import * as Notifications from "expo-notifications";
 
 interface WorkoutCardProps {
      workout: Workout;
@@ -53,6 +54,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      const [isMusicInfoModalVisible, setIsMusicInfoModalVisible] = useState(false);
      const [modalScale] = useState(new Animated.Value(0));
      const [volume, setVolume] = useState(0.2);
+     const [notificationId, setNotificationId] = useState<string | null>(null);
 
      const musicTracks: MusicTracks = {
           music1: require("../assets/music1.mp3"),
@@ -99,8 +101,8 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                     await Audio.setAudioModeAsync({
                          allowsRecordingIOS: false,
                          playsInSilentModeIOS: true,
-                         staysActiveInBackground: false,
-                         shouldDuckAndroid: false,
+                         staysActiveInBackground: true,
+                         shouldDuckAndroid: true,
                     });
 
                     const { sound: endSound } = await Audio.Sound.createAsync(require("../assets/workout_end.mp3"), {
@@ -206,6 +208,88 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
           }
      }, [isDeleteModalVisible, isResetModalVisible, isMusicInfoModalVisible]);
 
+     // 알림 관련 로직
+     useEffect(() => {
+          const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+               const { actionIdentifier, notification } = response;
+               if (notification.request.content.data.workoutId !== workout.id) {
+                    return;
+               }
+
+               if (actionIdentifier === "pause-action") {
+                    setIsPaused(true);
+                    logger.log(`Notification action: PAUSE for workout ${workout.name}`);
+               } else if (actionIdentifier === "resume-action") {
+                    setIsPaused(false);
+                    logger.log(`Notification action: RESUME for workout ${workout.name}`);
+               } else if (actionIdentifier === "stop-action") {
+                    handleReset();
+                    logger.log(`Notification action: STOP for workout ${workout.name}`);
+               }
+          });
+
+          return () => {
+               subscription.remove();
+          };
+     }, [workout.id]);
+
+     useEffect(() => {
+          const manageWorkoutNotification = async () => {
+               if (isTimerActive) {
+                    if (notificationId) {
+                         await Notifications.dismissNotificationAsync(notificationId);
+                    }
+
+                    const title = `운동 중: ${workout.name}`;
+                    const body = isPaused
+                         ? "일시정지됨. 계속하려면 누르세요."
+                         : `세트 ${setCount}/${
+                                workout.cycleCount === 0 ? "∞" : workout.cycleCount
+                           } | 횟수 ${repeatCount}/${workout.repeatCount === 0 ? "∞" : workout.repeatCount}`;
+
+                    const newNotificationId = await Notifications.scheduleNotificationAsync({
+                         content: {
+                              title: title,
+                              body: body,
+                              sticky: true,
+                              data: { workoutId: workout.id },
+                              categoryIdentifier: "workout-controls",
+                              color: workout.backgroundColor,
+                              vibrate: [0],
+                              subtitle: `세트 ${setCount}/${workout.cycleCount === 0 ? "∞" : workout.cycleCount}`,
+                         },
+                         trigger: null,
+                    });
+                    setNotificationId(newNotificationId);
+                    logger.log(`Notification scheduled/updated for ${workout.name}, ID: ${newNotificationId}`);
+               } else {
+                    if (notificationId) {
+                         await Notifications.dismissNotificationAsync(notificationId);
+                         setNotificationId(null);
+                         logger.log(`Notification dismissed for ${workout.name}, ID: ${notificationId}`);
+                    }
+               }
+          };
+
+          manageWorkoutNotification();
+
+          // 컴포넌트가 unmount될 때 알림 제거
+          return () => {
+               if (notificationId) {
+                    Notifications.dismissNotificationAsync(notificationId).catch((err) =>
+                         logger.error("Failed to dismiss notification on unmount", err)
+                    );
+               }
+          };
+     }, [isTimerActive, isPaused, workout.name]);
+
+     const dismissNotification = async () => {
+          if (notificationId) {
+               await Notifications.dismissNotificationAsync(notificationId);
+               setNotificationId(null);
+          }
+     };
+
      const playWorkoutEndSound = async () => {
           try {
                if (!workoutEndSound) {
@@ -239,6 +323,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      };
 
      const handleReset = () => {
+          dismissNotification();
           if (startTime && (isTimerActive || isPaused)) {
                const historyItem: WorkoutHistory = {
                     id: uuidv4(),
@@ -264,6 +349,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      };
 
      const celebrateCompletion = (finalRepeatCount: number) => {
+          dismissNotification();
           setIsCompleted(true);
           if (startTime) {
                const endTime = new Date();
@@ -342,6 +428,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      };
 
      const handleDeleteConfirm = async () => {
+          dismissNotification();
           if (backgroundMusic) {
                await backgroundMusic.stopAsync();
                await backgroundMusic.unloadAsync();
@@ -638,7 +725,7 @@ const styles = StyleSheet.create({
      },
      musicLabel: {
           fontSize: 16,
-          fontWeight: 600,
+          fontWeight: "600",
           color: "#FFFFFF",
      },
      musicPickerContainer: {
