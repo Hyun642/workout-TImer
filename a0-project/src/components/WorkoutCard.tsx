@@ -261,12 +261,10 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                          trigger: null,
                     });
                     setNotificationId(newNotificationId);
-                    logger.log(`Notification scheduled/updated for ${workout.name}, ID: ${newNotificationId}`);
                } else {
                     if (notificationId) {
                          await Notifications.dismissNotificationAsync(notificationId);
                          setNotificationId(null);
-                         logger.log(`Notification dismissed for ${workout.name}, ID: ${notificationId}`);
                     }
                }
           };
