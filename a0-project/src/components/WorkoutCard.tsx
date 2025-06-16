@@ -1,3 +1,5 @@
+// src/components/WorkoutCard.tsx
+
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Pressable, Switch, Modal, Animated, ScrollView } from "react-native";
 import Slider from "@react-native-community/slider";
@@ -12,6 +14,7 @@ import { Audio } from "expo-av";
 import logger from "../utils/logger";
 import * as Notifications from "expo-notifications";
 
+// ... (saveWorkoutHistory 함수는 기존과 동일)
 interface WorkoutCardProps {
      workout: Workout;
      onDelete: (id: string) => void;
@@ -54,7 +57,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      const [isMusicInfoModalVisible, setIsMusicInfoModalVisible] = useState(false);
      const [modalScale] = useState(new Animated.Value(0));
      const [volume, setVolume] = useState(0.2);
-     const [notificationId, setNotificationId] = useState<string | null>(null);
+     const [notificationId, setNotificationId] = useState<string | null>(null); // [추가] 알림 ID 상태
 
      const musicTracks: MusicTracks = {
           music1: require("../assets/music1.mp3"),
@@ -101,8 +104,10 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                     await Audio.setAudioModeAsync({
                          allowsRecordingIOS: false,
                          playsInSilentModeIOS: true,
-                         staysActiveInBackground: true,
+                         staysActiveInBackground: true, // [중요] 백그라운드 오디오
                          shouldDuckAndroid: true,
+                         interruptionModeAndroid: 1, // DO_NOT_MIX
+                         interruptionModeIOS: 1, // DO_NOT_MIX
                     });
 
                     const { sound: endSound } = await Audio.Sound.createAsync(require("../assets/workout_end.mp3"), {
@@ -117,6 +122,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
           };
           initializeSounds();
 
+          // ... (기존 반환 로직)
           return () => {
                if (workoutEndSound) {
                     workoutEndSound.unloadAsync().then(() => {
@@ -130,9 +136,12 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                          logger.log("Background music unloaded");
                     });
                }
+               // [추가] 컴포넌트 unmount 시 알림 제거
+               dismissNotification();
           };
      }, []);
 
+     // ... (music 관련 useEffect 들은 기존과 동일)
      useEffect(() => {
           const loadBackgroundMusic = async () => {
                setIsMusicLoading(true);
@@ -208,83 +217,79 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
           }
      }, [isDeleteModalVisible, isResetModalVisible, isMusicInfoModalVisible]);
 
-     // 알림 관련 로직
+     // [추가] 알림 액션 처리
      useEffect(() => {
           const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
                const { actionIdentifier, notification } = response;
+
+               // 이 카드의 알림이 아니면 무시
                if (notification.request.content.data.workoutId !== workout.id) {
                     return;
                }
 
-               if (actionIdentifier === "pause-action") {
-                    setIsPaused(true);
-                    logger.log(`Notification action: PAUSE for workout ${workout.name}`);
-               } else if (actionIdentifier === "resume-action") {
-                    setIsPaused(false);
-                    logger.log(`Notification action: RESUME for workout ${workout.name}`);
-               } else if (actionIdentifier === "stop-action") {
-                    handleReset();
-                    logger.log(`Notification action: STOP for workout ${workout.name}`);
+               logger.log(`Notification action received: ${actionIdentifier}`);
+               switch (actionIdentifier) {
+                    case "pause-action":
+                         setIsPaused(true);
+                         break;
+                    case "resume-action":
+                         setIsPaused(false);
+                         break;
+                    case "stop-action":
+                         handleReset();
+                         break;
                }
           });
 
           return () => {
                subscription.remove();
           };
-     }, [workout.id]);
+     }, [workout.id]); // workout.id가 변경될 일은 없지만, 의존성을 명확히 함
 
+     // [추가] 운동 상태에 따라 알림을 관리(생성/업데이트/제거)
      useEffect(() => {
           const manageWorkoutNotification = async () => {
                if (isTimerActive) {
+                    // 기존 알림이 있다면 제거 (업데이트를 위해)
                     if (notificationId) {
                          await Notifications.dismissNotificationAsync(notificationId);
                     }
 
                     const title = `운동 중: ${workout.name}`;
-                    const body = isPaused
-                         ? "일시정지됨. 계속하려면 누르세요."
-                         : `세트 ${setCount}/${
-                                workout.cycleCount === 0 ? "∞" : workout.cycleCount
-                           } | 횟수 ${repeatCount}/${workout.repeatCount === 0 ? "∞" : workout.repeatCount}`;
+                    const body = `세트 ${setCount}/${
+                         workout.cycleCount === 0 ? "∞" : workout.cycleCount
+                    } | 횟수 ${repeatCount}/${workout.repeatCount === 0 ? "∞" : workout.repeatCount}`;
+
+                    // 상태에 따라 다른 카테고리(버튼 조합) 사용
+                    const categoryIdentifier = isPaused ? "workout-paused" : "workout-running";
 
                     const newNotificationId = await Notifications.scheduleNotificationAsync({
                          content: {
                               title: title,
                               body: body,
-                              sticky: true,
-                              data: { workoutId: workout.id },
-                              categoryIdentifier: "workout-controls",
+                              sticky: true, // 사용자가 지우지 못하게 함 (Android)
+                              data: { workoutId: workout.id }, // 어떤 운동에 대한 알림인지 식별
+                              categoryIdentifier: categoryIdentifier, // 상태에 맞는 버튼 표시
                               color: workout.backgroundColor,
-                              vibrate: [0],
-                              subtitle: `세트 ${setCount}/${workout.cycleCount === 0 ? "∞" : workout.cycleCount}`,
                          },
-                         trigger: null,
+                         trigger: null, // 즉시 표시
                     });
                     setNotificationId(newNotificationId);
                } else {
-                    if (notificationId) {
-                         await Notifications.dismissNotificationAsync(notificationId);
-                         setNotificationId(null);
-                    }
+                    // 타이머가 비활성화되면 알림 제거
+                    dismissNotification();
                }
           };
 
           manageWorkoutNotification();
+     }, [isTimerActive, isPaused, workout, repeatCount, setCount]);
 
-          // 컴포넌트가 unmount될 때 알림 제거
-          return () => {
-               if (notificationId) {
-                    Notifications.dismissNotificationAsync(notificationId).catch((err) =>
-                         logger.error("Failed to dismiss notification on unmount", err)
-                    );
-               }
-          };
-     }, [isTimerActive, isPaused, workout.name]);
-
+     // [추가] 알림 제거 헬퍼 함수
      const dismissNotification = async () => {
           if (notificationId) {
                await Notifications.dismissNotificationAsync(notificationId);
                setNotificationId(null);
+               logger.log("Notification dismissed.");
           }
      };
 
@@ -321,7 +326,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      };
 
      const handleReset = () => {
-          dismissNotification();
+          dismissNotification(); // [수정] 리셋 시 알림 제거
           if (startTime && (isTimerActive || isPaused)) {
                const historyItem: WorkoutHistory = {
                     id: uuidv4(),
@@ -347,7 +352,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      };
 
      const celebrateCompletion = (finalRepeatCount: number) => {
-          dismissNotification();
+          dismissNotification(); // [수정] 완료 시 알림 제거
           setIsCompleted(true);
           if (startTime) {
                const endTime = new Date();
@@ -370,8 +375,12 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      };
 
      const handleComplete = () => {
+          // 이 로직은 `WorkoutCard.tsx`의 기존 `handleComplete`와 완전히 동일합니다.
+          // 유일한 차이점은 이제 이 함수의 결과로 상태가 변경되면,
+          // 알림을 관리하는 `useEffect`가 자동으로 트리거되어 알림 내용이 업데이트된다는 점입니다.
           setRepeatCount((prev) => {
                const newCount = prev + 1;
+               // 운동 횟수가 0이 아니면서, 현재 횟수가 목표 횟수와 같거나 크면
                const isLastRepOfSet = workout.repeatCount !== 0 && newCount >= workout.repeatCount;
 
                logger.log(`handleComplete called: repeatCount=${newCount}, isLastRepOfSet=${isLastRepOfSet}`);
@@ -379,6 +388,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                if (isLastRepOfSet) {
                     setSetCount((prevSet) => {
                          const newSetCount = prevSet + 1;
+                         // 사이클 횟수가 0이 아니면서, 현재 세트가 목표 세트보다 크면 운동 종료
                          const isLastSet = workout.cycleCount !== 0 && newSetCount > workout.cycleCount;
 
                          logger.log(`Set completed: setCount=${newSetCount}, isLastSet=${isLastSet}`);
@@ -392,12 +402,14 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                               return prevSet;
                          }
 
+                         // 세트 간 휴식 시간이 있으면 휴식 시작
                          if (workout.cycleRestTime > 0) {
                               setIsCycleResting(true);
                               logger.log(
                                    `Entering cycle rest for set ${newSetCount}, cycleRestTime=${workout.cycleRestTime}`
                               );
                          } else {
+                              // 세트 간 휴식이 없으면 바로 다음 세트 시작
                               logger.log("Cycle rest time is 0, skipping cycle rest");
                               setIsTimerActive(true);
                               setIsPaused(false);
@@ -405,9 +417,11 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
 
                          return newSetCount;
                     });
+                    // 횟수는 0으로 리셋 (다음 세트를 위해)
                     return 0;
                }
 
+               // 마지막 횟수가 아니라면 타이머 계속 활성화
                if (workout.repeatCount === 0 || newCount < workout.repeatCount) {
                     setIsTimerActive(true);
                     setIsPaused(false);
@@ -426,7 +440,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      };
 
      const handleDeleteConfirm = async () => {
-          dismissNotification();
+          dismissNotification(); // [수정] 삭제 시 알림 제거
           if (backgroundMusic) {
                await backgroundMusic.stopAsync();
                await backgroundMusic.unloadAsync();
@@ -436,6 +450,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
           setIsDeleteModalVisible(false);
      };
 
+     // ... (나머지 코드, JSX 렌더링 부분 등은 기존과 동일합니다)
      const handleDeleteCancel = () => {
           setIsDeleteModalVisible(false);
      };

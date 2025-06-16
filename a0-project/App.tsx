@@ -1,3 +1,5 @@
+// App.tsx
+
 import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -51,35 +53,50 @@ export default function App() {
      useEffect(() => {
           registerForPushNotificationsAsync();
 
-          // 알림 액션 카테고리 설정
-          Notifications.setNotificationCategoryAsync("workout-controls", [
-               {
-                    identifier: "pause-action",
-                    buttonTitle: "일시정지",
-                    options: {
-                         // opensAppToForeground: false, // 이 옵션은 일시정지 후에도 알림이 그대로 있게 하므로 유용합니다.
+          // [수정] 알림 액션 카테고리를 두 개로 분리하여 설정
+          Promise.all([
+               Notifications.setNotificationCategoryAsync("workout-running", [
+                    {
+                         identifier: "pause-action",
+                         buttonTitle: "일시정지",
+                         options: {
+                              // 백그라운드에서 상태만 변경하고 앱을 열지 않음
+                              opensAppToForeground: false,
+                         },
                     },
-               },
-               {
-                    identifier: "resume-action",
-                    buttonTitle: "계속",
-                    options: {
-                         opensAppToForeground: true,
+                    {
+                         identifier: "stop-action",
+                         buttonTitle: "중지",
+                         options: {
+                              // 중지 시에는 앱을 열어 상태 확인
+                              opensAppToForeground: true,
+                              // destructive: true, // iOS에서 빨간색으로 표시
+                         },
                     },
-               },
-               {
-                    identifier: "stop-action",
-                    buttonTitle: "중지",
-                    options: {
-                         opensAppToForeground: true,
+               ]),
+               Notifications.setNotificationCategoryAsync("workout-paused", [
+                    {
+                         identifier: "resume-action",
+                         buttonTitle: "계속",
+                         options: {
+                              opensAppToForeground: false,
+                         },
                     },
-               },
+                    {
+                         identifier: "stop-action",
+                         buttonTitle: "중지",
+                         options: {
+                              opensAppToForeground: true,
+                              // destructive: true,
+                         },
+                    },
+               ]),
           ])
                .then(() => {
-                    logger.log("Notification category 'workout-controls' set.");
+                    logger.log("Notification categories 'workout-running' and 'workout-paused' set.");
                })
                .catch((err) => {
-                    logger.error("Failed to set notification category.", err);
+                    logger.error("Failed to set notification categories.", err);
                });
      }, []);
 
