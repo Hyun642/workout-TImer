@@ -1,5 +1,3 @@
-// App.tsx
-
 import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -11,7 +9,7 @@ import SettingsScreen from "./src/screens/SettingsScreen";
 import { StatusBar } from "react-native";
 import * as Notifications from "expo-notifications";
 import logger from "./src/utils/logger";
-
+import { SettingsProvider } from "./src/contexts/SettingsContext";
 const Stack = createStackNavigator();
 
 // 알림 핸들러 설정: 앱이 실행 중일 때도 알림을 표시
@@ -101,19 +99,16 @@ export default function App() {
      }, []);
 
      return (
-          <>
+          // [수정] SettingsProvider로 전체 앱을 감쌉니다.
+          <SettingsProvider>
                <StatusBar backgroundColor="#1C1C1C" barStyle="light-content" />
                <NavigationContainer>
                     <Stack.Navigator
                          initialRouteName="Home"
                          screenOptions={{
-                              headerStyle: {
-                                   backgroundColor: "#1C1C1C",
-                              },
+                              headerStyle: { backgroundColor: "#1C1C1C" },
                               headerTintColor: "lightgray",
-                              headerTitleStyle: {
-                                   fontWeight: "bold",
-                              },
+                              headerTitleStyle: { fontWeight: "bold" },
                          }}
                     >
                          <Stack.Screen
@@ -136,6 +131,6 @@ export default function App() {
                          <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: "설정" }} />
                     </Stack.Navigator>
                </NavigationContainer>
-          </>
+          </SettingsProvider>
      );
 }

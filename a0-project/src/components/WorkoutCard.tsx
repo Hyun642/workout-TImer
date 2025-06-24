@@ -1,11 +1,9 @@
-// src/components/WorkoutCard.tsx
-
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Pressable, Switch, Modal, Animated, ScrollView } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, Pressable, Switch, Modal, Animated, ScrollView, Dimensions } from "react-native";
 import Slider from "@react-native-community/slider";
 import { Picker } from "@react-native-picker/picker";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
-import Timer from "./Timer";
+import * as Progress from "react-native-progress";
 import { Workout } from "../types/workout";
 import { WorkoutHistory } from "../types/history";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -13,8 +11,8 @@ import { v4 as uuidv4 } from "uuid";
 import { Audio } from "expo-av";
 import logger from "../utils/logger";
 import * as Notifications from "expo-notifications";
+import { useSettings } from "../contexts/SettingsContext";
 
-// ... (saveWorkoutHistory 함수는 기존과 동일)
 interface WorkoutCardProps {
      workout: Workout;
      onDelete: (id: string) => void;
@@ -29,25 +27,32 @@ const saveWorkoutHistory = async (historyItem: WorkoutHistory, onHistoryUpdate: 
           historyArray.push(historyItem);
           await AsyncStorage.setItem("workoutHistory", JSON.stringify(historyArray));
           onHistoryUpdate();
-          logger.log("Workout history saved and stats updated");
      } catch (error) {
           logger.error("Error saving workout history:", error);
      }
 };
 
 type MusicTrackKey = "music1" | "music2" | "music3";
-type MusicTracks = Record<MusicTrackKey, number>;
+type TimerMode = "preStart" | "workout" | "prep" | "cycleRest";
 
 export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate }: WorkoutCardProps) {
      const [isTimerActive, setIsTimerActive] = useState(false);
-     const [repeatCount, setRepeatCount] = useState(0);
-     const [setCount, setSetCount] = useState(1);
      const [isPaused, setIsPaused] = useState(false);
      const [isCompleted, setIsCompleted] = useState(false);
-     const [isCycleResting, setIsCycleResting] = useState(false);
+
+     const [repeatCount, setRepeatCount] = useState(0);
+     const [setCount, setSetCount] = useState(1);
+
+     const [timerMode, setTimerMode] = useState<TimerMode>("preStart");
+     const [displayTime, setDisplayTime] = useState(workout.preStartTime);
+
+     const soundsRef = useRef<{ [key: string]: Audio.Sound | null }>({});
+     const intervalRef = useRef<NodeJS.Timeout | null>(null);
      const [startTime, setStartTime] = useState<Date | null>(null);
      const [totalTime, setTotalTime] = useState<number>(0);
-     const [workoutEndSound, setWorkoutEndSound] = useState<Audio.Sound | null>(null);
+
+     const { soundEffectsVolume } = useSettings();
+
      const [backgroundMusic, setBackgroundMusic] = useState<Audio.Sound | null>(null);
      const [isMusicEnabled, setIsMusicEnabled] = useState(false);
      const [isMusicLoading, setIsMusicLoading] = useState(false);
@@ -57,9 +62,9 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      const [isMusicInfoModalVisible, setIsMusicInfoModalVisible] = useState(false);
      const [modalScale] = useState(new Animated.Value(0));
      const [volume, setVolume] = useState(0.2);
-     const [notificationId, setNotificationId] = useState<string | null>(null); // [추가] 알림 ID 상태
+     const [notificationId, setNotificationId] = useState<string | null>(null);
 
-     const musicTracks: MusicTracks = {
+     const musicTracks = {
           music1: require("../assets/music1.mp3"),
           music2: require("../assets/music2.mp3"),
           music3: require("../assets/music3.mp3"),
@@ -81,229 +86,134 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                title: "자신감 by SellBuyMusic",
                url: "https://sellbuymusic.com/md/mlqtnhf-vfczzbz",
           },
-          "운동 종료": {
-               provider: "셀바이뮤직",
-               title: "Di-Ding 4",
-               url: "https://sellbuymusic.com/md/sjrnctt-ofczzbz",
-          },
-          "휴식 종료": {
-               provider: "셀바이뮤직",
-               title: "Di-Ding 4",
-               url: "https://sellbuymusic.com/md/seyqcbb-dfczzbz",
-          },
-          "세트 종료": {
-               provider: "셀바이뮤직",
-               title: "Error 2",
-               url: "https://sellbuymusic.com/md/suunfxz-yfczzbz",
-          },
      };
 
      useEffect(() => {
-          const initializeSounds = async () => {
-               try {
-                    await Audio.setAudioModeAsync({
-                         allowsRecordingIOS: false,
-                         playsInSilentModeIOS: true,
-                         staysActiveInBackground: true, // [중요] 백그라운드 오디오
-                         shouldDuckAndroid: true,
-                         interruptionModeAndroid: 1, // DO_NOT_MIX
-                         interruptionModeIOS: 1, // DO_NOT_MIX
-                    });
-
-                    const { sound: endSound } = await Audio.Sound.createAsync(require("../assets/workout_end.mp3"), {
-                         shouldPlay: false,
-                    });
-                    await endSound.setVolumeAsync(1.0);
-                    setWorkoutEndSound(endSound);
-                    logger.log("Workout end sound loaded successfully with volume 1.0");
-               } catch (error) {
-                    logger.error("Failed to load workout end sound:", error);
-               }
+          const initialize = async () => {
+               await Audio.setAudioModeAsync({
+                    allowsRecordingIOS: false,
+                    playsInSilentModeIOS: true,
+                    staysActiveInBackground: true,
+                    shouldDuckAndroid: true,
+                    interruptionModeAndroid: 2,
+                    interruptionModeIOS: 2,
+               });
+               const { sound: restS } = await Audio.Sound.createAsync(require("../assets/start.mp3"));
+               const { sound: setS } = await Audio.Sound.createAsync(require("../assets/great.mp3"));
+               const { sound: workoutS } = await Audio.Sound.createAsync(require("../assets/complete.mp3"));
+               const { sound: countS } = await Audio.Sound.createAsync(require("../assets/count.mp3"));
+               const { sound: endingS } = await Audio.Sound.createAsync(require("../assets/ending.mp3"));
+               soundsRef.current = {
+                    restEndSound: restS,
+                    setEndSound: setS,
+                    workoutEndSound: workoutS,
+                    countSound: countS,
+                    endingSound: endingS,
+               };
           };
-          initializeSounds();
-
-          // ... (기존 반환 로직)
+          initialize();
           return () => {
-               if (workoutEndSound) {
-                    workoutEndSound.unloadAsync().then(() => {
-                         setWorkoutEndSound(null);
-                         logger.log("Workout end sound unloaded");
-                    });
-               }
-               if (backgroundMusic) {
-                    backgroundMusic.unloadAsync().then(() => {
-                         setBackgroundMusic(null);
-                         logger.log("Background music unloaded");
-                    });
-               }
-               // [추가] 컴포넌트 unmount 시 알림 제거
+               if (intervalRef.current) clearInterval(intervalRef.current);
+               Object.values(soundsRef.current).forEach((sound) => sound?.unloadAsync());
+               backgroundMusic?.unloadAsync();
                dismissNotification();
           };
      }, []);
 
-     // ... (music 관련 useEffect 들은 기존과 동일)
      useEffect(() => {
-          const loadBackgroundMusic = async () => {
-               setIsMusicLoading(true);
-               if (backgroundMusic) {
-                    await backgroundMusic.unloadAsync();
-                    logger.log(`Unloaded previous ${selectedTrack}`);
-               }
-               try {
-                    const { sound } = await Audio.Sound.createAsync(musicTracks[selectedTrack], {
-                         shouldPlay: false,
-                    });
-                    await sound.setVolumeAsync(volume);
-                    setBackgroundMusic(sound);
-                    logger.log(`Background music ${selectedTrack} loaded successfully with volume ${volume}`);
-               } catch (error) {
-                    logger.error(`Failed to load background music ${selectedTrack}:`, error);
-               } finally {
-                    setIsMusicLoading(false);
-               }
-          };
-          loadBackgroundMusic();
-     }, [selectedTrack]);
-
-     useEffect(() => {
-          const updateVolume = async () => {
-               if (backgroundMusic) {
-                    await backgroundMusic.setVolumeAsync(volume);
-                    logger.log(`Volume set to ${volume}`);
-               }
-          };
-          updateVolume();
-     }, [volume, backgroundMusic]);
-
-     useEffect(() => {
-          const controlMusic = async () => {
-               if (isMusicLoading || !backgroundMusic) {
-                    logger.warn(`Background music ${selectedTrack} not ready yet. Loading: ${isMusicLoading}`);
-                    return;
-               }
-               try {
-                    if (isMusicEnabled && isTimerActive && !isPaused) {
-                         await backgroundMusic.setIsLoopingAsync(true);
-                         await backgroundMusic.playAsync();
-                         logger.log(`Playing ${selectedTrack}`);
-                    } else {
-                         await backgroundMusic.pauseAsync();
-                         logger.log(`Paused ${selectedTrack}`);
-                    }
-               } catch (error) {
-                    logger.error(`Error controlling background music ${selectedTrack}:`, error);
-               }
-          };
-
-          if (backgroundMusic && !isMusicLoading) {
-               controlMusic();
-          }
-     }, [isTimerActive, isPaused, isMusicEnabled, backgroundMusic, isMusicLoading]);
-
-     useEffect(() => {
-          if (isDeleteModalVisible || isResetModalVisible || isMusicInfoModalVisible) {
-               Animated.spring(modalScale, {
-                    toValue: 1,
-                    friction: 8,
-                    tension: 40,
-                    useNativeDriver: true,
-               }).start();
-          } else {
-               Animated.timing(modalScale, {
-                    toValue: 0,
-                    duration: 200,
-                    useNativeDriver: true,
-               }).start();
-          }
-     }, [isDeleteModalVisible, isResetModalVisible, isMusicInfoModalVisible]);
-
-     // [추가] 알림 액션 처리
-     useEffect(() => {
-          const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-               const { actionIdentifier, notification } = response;
-
-               // 이 카드의 알림이 아니면 무시
-               if (notification.request.content.data.workoutId !== workout.id) {
-                    return;
-               }
-
-               logger.log(`Notification action received: ${actionIdentifier}`);
-               switch (actionIdentifier) {
-                    case "pause-action":
-                         setIsPaused(true);
-                         break;
-                    case "resume-action":
-                         setIsPaused(false);
-                         break;
-                    case "stop-action":
-                         handleReset();
-                         break;
-               }
+          Object.values(soundsRef.current).forEach((sound) => {
+               if (sound) sound.setVolumeAsync(soundEffectsVolume);
           });
+     }, [soundEffectsVolume, soundsRef.current]);
 
-          return () => {
-               subscription.remove();
-          };
-     }, [workout.id]); // workout.id가 변경될 일은 없지만, 의존성을 명확히 함
-
-     // [추가] 운동 상태에 따라 알림을 관리(생성/업데이트/제거)
-     useEffect(() => {
-          const manageWorkoutNotification = async () => {
-               if (isTimerActive) {
-                    // 기존 알림이 있다면 제거 (업데이트를 위해)
-                    if (notificationId) {
-                         await Notifications.dismissNotificationAsync(notificationId);
-                    }
-
-                    const title = `운동 중: ${workout.name}`;
-                    const body = `세트 ${setCount}/${
-                         workout.cycleCount === 0 ? "∞" : workout.cycleCount
-                    } | 횟수 ${repeatCount}/${workout.repeatCount === 0 ? "∞" : workout.repeatCount}`;
-
-                    // 상태에 따라 다른 카테고리(버튼 조합) 사용
-                    const categoryIdentifier = isPaused ? "workout-paused" : "workout-running";
-
-                    const newNotificationId = await Notifications.scheduleNotificationAsync({
-                         content: {
-                              title: title,
-                              body: body,
-                              sticky: true, // 사용자가 지우지 못하게 함 (Android)
-                              data: { workoutId: workout.id }, // 어떤 운동에 대한 알림인지 식별
-                              categoryIdentifier: categoryIdentifier, // 상태에 맞는 버튼 표시
-                              color: workout.backgroundColor,
-                         },
-                         trigger: null, // 즉시 표시
-                    });
-                    setNotificationId(newNotificationId);
-               } else {
-                    // 타이머가 비활성화되면 알림 제거
-                    dismissNotification();
-               }
-          };
-
-          manageWorkoutNotification();
-     }, [isTimerActive, isPaused, workout, repeatCount, setCount]);
-
-     // [추가] 알림 제거 헬퍼 함수
-     const dismissNotification = async () => {
-          if (notificationId) {
-               await Notifications.dismissNotificationAsync(notificationId);
-               setNotificationId(null);
-               logger.log("Notification dismissed.");
+     const getDurationForMode = (mode: TimerMode): number => {
+          switch (mode) {
+               case "preStart":
+                    return workout.preStartTime;
+               case "workout":
+                    return workout.duration;
+               case "prep":
+                    return workout.prepTime;
+               case "cycleRest":
+                    return workout.cycleRestTime;
+               default:
+                    return 0;
           }
      };
 
-     const playWorkoutEndSound = async () => {
-          try {
-               if (!workoutEndSound) {
-                    logger.warn("Workout end sound not initialized");
+     useEffect(() => {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+
+          if (isTimerActive && !isPaused) {
+               intervalRef.current = setInterval(() => {
+                    setDisplayTime((prevTime) => prevTime - 1);
+               }, 1000);
+          }
+          return () => {
+               if (intervalRef.current) clearInterval(intervalRef.current);
+          };
+     }, [isTimerActive, isPaused]);
+
+     useEffect(() => {
+          if (isTimerActive) {
+               if (displayTime <= 3 && displayTime > 0) {
+                    if (timerMode !== "preStart") {
+                         soundsRef.current.endingSound?.replayAsync();
+                    } else if (displayTime === 3) {
+                         soundsRef.current.countSound?.replayAsync();
+                    }
+               } else if (displayTime <= 0) {
+                    // [핵심 수정] 0초가 되는 순간, 사운드를 먼저 재생하고 상태 전환
+                    playCompletionSoundAndSwitchState();
+               }
+          }
+     }, [displayTime, isTimerActive]);
+
+     const playCompletionSoundAndSwitchState = () => {
+          if (timerMode === "workout") {
+               const isLastRep = workout.repeatCount > 0 && repeatCount + 1 >= workout.repeatCount;
+               const isLastSet = workout.cycleCount > 0 && setCount >= workout.cycleCount;
+               if (isLastRep && isLastSet) {
+                    soundsRef.current.workoutEndSound?.replayAsync();
+               } else {
+                    soundsRef.current.setEndSound?.replayAsync();
+               }
+          } else if (timerMode === "prep" || timerMode === "cycleRest") {
+               soundsRef.current.restEndSound?.replayAsync();
+          }
+          // 사운드 재생 후, 상태 전환
+          handleTimerCompletion();
+     };
+
+     const handleTimerCompletion = () => {
+          let nextMode: TimerMode = "workout";
+          if (timerMode === "preStart") {
+               nextMode = "workout";
+          } else if (timerMode === "workout") {
+               const newReps = repeatCount + 1;
+               const isLastRep = workout.repeatCount > 0 && newReps >= workout.repeatCount;
+               const isLastSet = workout.cycleCount > 0 && setCount >= workout.cycleCount;
+               if (isLastRep && isLastSet) {
+                    celebrateCompletion(newReps);
                     return;
                }
-               await workoutEndSound.setVolumeAsync(1.0);
-               await workoutEndSound.replayAsync();
-               logger.log("Workout end sound played with volume 1.0");
-          } catch (error) {
-               logger.error("Error playing workout end sound:", error);
+               setRepeatCount(newReps);
+               nextMode = isLastRep ? "cycleRest" : "prep";
+          } else if (timerMode === "prep" || timerMode === "cycleRest") {
+               if (timerMode === "cycleRest") {
+                    setSetCount((prev) => prev + 1);
+                    setRepeatCount(0);
+               }
+               nextMode = "workout";
+          }
+
+          if (getDurationForMode(nextMode) > 0) {
+               setTimerMode(nextMode);
+               setDisplayTime(getDurationForMode(nextMode));
+          } else {
+               // 0초짜리 휴식은 건너뛰기
+               setTimerMode("workout");
+               setDisplayTime(getDurationForMode("workout"));
           }
      };
 
@@ -312,148 +222,130 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                setStartTime(new Date());
                setIsTimerActive(true);
                setIsPaused(false);
-               logger.log("Timer started");
-          } else if (isCompleted) {
-               handleReset();
-          } else if (isTimerActive) {
-               setIsPaused(!isPaused);
-               logger.log(`Timer ${isPaused ? "resumed" : "paused"}`);
-          }
-     };
-
-     const handleResetPress = () => {
-          setIsResetModalVisible(true);
+          } else if (isCompleted) handleReset();
+          else if (isTimerActive) setIsPaused((prev) => !prev);
      };
 
      const handleReset = () => {
-          dismissNotification(); // [수정] 리셋 시 알림 제거
-          if (startTime && (isTimerActive || isPaused)) {
-               const historyItem: WorkoutHistory = {
-                    id: uuidv4(),
-                    workoutId: workout.id,
-                    workoutName: workout.name,
-                    startTime: startTime.toISOString(),
-                    endTime: new Date().toISOString(),
-                    totalRepetitions: repeatCount,
-                    completed: false,
-               };
-               saveWorkoutHistory(historyItem, onHistoryUpdate);
-          }
-
+          if (intervalRef.current) clearInterval(intervalRef.current);
           setIsTimerActive(false);
+          if (startTime) {
+               const totalReps = (setCount - 1) * workout.repeatCount + repeatCount;
+               saveWorkoutHistory(
+                    {
+                         id: uuidv4(),
+                         workoutId: workout.id,
+                         workoutName: workout.name,
+                         startTime: startTime.toISOString(),
+                         endTime: new Date().toISOString(),
+                         totalRepetitions: totalReps,
+                         completed: false,
+                    },
+                    onHistoryUpdate
+               );
+          }
           setRepeatCount(0);
           setSetCount(1);
           setIsPaused(false);
           setIsCompleted(false);
-          setIsCycleResting(false);
           setStartTime(null);
           setTotalTime(0);
-          logger.log("Timer reset: All states cleared");
+          setTimerMode("preStart");
+          setDisplayTime(workout.preStartTime);
      };
 
      const celebrateCompletion = (finalRepeatCount: number) => {
-          dismissNotification(); // [수정] 완료 시 알림 제거
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          setIsTimerActive(false);
           setIsCompleted(true);
           if (startTime) {
                const endTime = new Date();
-               const timeDiff = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
-               setTotalTime(timeDiff);
-
-               const historyItem: WorkoutHistory = {
-                    id: uuidv4(),
-                    workoutId: workout.id,
-                    workoutName: workout.name,
-                    startTime: startTime.toISOString(),
-                    endTime: endTime.toISOString(),
-                    totalRepetitions: finalRepeatCount,
-                    completed: true,
-               };
-               saveWorkoutHistory(historyItem, onHistoryUpdate);
-               playWorkoutEndSound();
-               logger.log("Workout completed, history saved");
+               const totalReps =
+                    (workout.cycleCount > 0
+                         ? (workout.cycleCount - 1) * workout.repeatCount
+                         : (setCount - 1) * workout.repeatCount) + finalRepeatCount;
+               setTotalTime(Math.floor((endTime.getTime() - startTime.getTime()) / 1000));
+               saveWorkoutHistory(
+                    {
+                         id: uuidv4(),
+                         workoutId: workout.id,
+                         workoutName: workout.name,
+                         startTime: startTime.toISOString(),
+                         endTime: endTime.toISOString(),
+                         totalRepetitions: totalReps,
+                         completed: true,
+                    },
+                    onHistoryUpdate
+               );
           }
      };
 
-     const handleComplete = () => {
-          // 이 로직은 `WorkoutCard.tsx`의 기존 `handleComplete`와 완전히 동일합니다.
-          // 유일한 차이점은 이제 이 함수의 결과로 상태가 변경되면,
-          // 알림을 관리하는 `useEffect`가 자동으로 트리거되어 알림 내용이 업데이트된다는 점입니다.
-          setRepeatCount((prev) => {
-               const newCount = prev + 1;
-               // 운동 횟수가 0이 아니면서, 현재 횟수가 목표 횟수와 같거나 크면
-               const isLastRepOfSet = workout.repeatCount !== 0 && newCount >= workout.repeatCount;
-
-               logger.log(`handleComplete called: repeatCount=${newCount}, isLastRepOfSet=${isLastRepOfSet}`);
-
-               if (isLastRepOfSet) {
-                    setSetCount((prevSet) => {
-                         const newSetCount = prevSet + 1;
-                         // 사이클 횟수가 0이 아니면서, 현재 세트가 목표 세트보다 크면 운동 종료
-                         const isLastSet = workout.cycleCount !== 0 && newSetCount > workout.cycleCount;
-
-                         logger.log(`Set completed: setCount=${newSetCount}, isLastSet=${isLastSet}`);
-
-                         if (isLastSet) {
-                              setIsTimerActive(false);
-                              setIsPaused(false);
-                              setIsCycleResting(false);
-                              celebrateCompletion(newCount);
-                              logger.log("Workout completed, all sets finished");
-                              return prevSet;
-                         }
-
-                         // 세트 간 휴식 시간이 있으면 휴식 시작
-                         if (workout.cycleRestTime > 0) {
-                              setIsCycleResting(true);
-                              logger.log(
-                                   `Entering cycle rest for set ${newSetCount}, cycleRestTime=${workout.cycleRestTime}`
-                              );
-                         } else {
-                              // 세트 간 휴식이 없으면 바로 다음 세트 시작
-                              logger.log("Cycle rest time is 0, skipping cycle rest");
-                              setIsTimerActive(true);
-                              setIsPaused(false);
-                         }
-
-                         return newSetCount;
-                    });
-                    // 횟수는 0으로 리셋 (다음 세트를 위해)
-                    return 0;
-               }
-
-               // 마지막 횟수가 아니라면 타이머 계속 활성화
-               if (workout.repeatCount === 0 || newCount < workout.repeatCount) {
-                    setIsTimerActive(true);
-                    setIsPaused(false);
-                    logger.log("Continuing to next repetition");
-               }
-
-               return newCount;
-          });
+     const formatTime = (seconds: number) => {
+          const safeSeconds = Math.max(0, seconds);
+          const mins = Math.floor(safeSeconds / 60);
+          const secs = safeSeconds % 60;
+          return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
      };
 
-     const handleCycleRestComplete = () => {
-          setIsCycleResting(false);
-          setIsTimerActive(true);
-          setIsPaused(false);
-          logger.log("Cycle rest completed, resuming timer for next set");
+     const getDynamicStyles = () => {
+          switch (timerMode) {
+               case "preStart":
+                    return {
+                         label: timerStyles.labelPreStart,
+                         time: timerStyles.timePreStart,
+                         color: timerStyles.timePreStart.color,
+                    };
+               case "prep":
+                    return {
+                         label: timerStyles.labelRest,
+                         time: timerStyles.timeRest,
+                         color: timerStyles.timeRest.color,
+                    };
+               case "cycleRest":
+                    return {
+                         label: timerStyles.labelCycleRest,
+                         time: timerStyles.timeCycleRest,
+                         color: timerStyles.timeCycleRest.color,
+                    };
+               default:
+                    return { label: timerStyles.label, time: timerStyles.time, color: timerStyles.time.color };
+          }
      };
 
+     const getLabelText = () => {
+          switch (timerMode) {
+               case "preStart":
+                    return "시작 준비";
+               case "prep":
+                    return "휴식";
+               case "cycleRest":
+                    return "세트 간 휴식";
+               default:
+                    return "운동";
+          }
+     };
+
+     const dismissNotification = async () => {
+          if (notificationId) {
+               await Notifications.dismissNotificationAsync(notificationId);
+               setNotificationId(null);
+          }
+     };
      const handleDeleteConfirm = async () => {
-          dismissNotification(); // [수정] 삭제 시 알림 제거
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          setIsTimerActive(false);
+          dismissNotification();
           if (backgroundMusic) {
                await backgroundMusic.stopAsync();
                await backgroundMusic.unloadAsync();
-               logger.log("Background music stopped and unloaded on delete");
           }
           onDelete(workout.id);
           setIsDeleteModalVisible(false);
      };
 
-     // ... (나머지 코드, JSX 렌더링 부분 등은 기존과 동일합니다)
-     const handleDeleteCancel = () => {
-          setIsDeleteModalVisible(false);
-     };
+     const { label, time, color } = getDynamicStyles();
+     const totalDuration = getDurationForMode(timerMode);
+     const progress = totalDuration > 0 ? (totalDuration - displayTime) / totalDuration : 0;
 
      return (
           <>
@@ -490,13 +382,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                                              style={styles.statusIcon}
                                         />
                                    ) : null}
-                                   <Pressable
-                                        onPress={() => {
-                                             logger.log("Editing workout:", workout);
-                                             onEdit(workout);
-                                        }}
-                                        style={styles.actionButton}
-                                   >
+                                   <Pressable onPress={() => onEdit(workout)} style={styles.actionButton}>
                                         <MaterialCommunityIcons name="pencil" size={24} color="#ffffff" />
                                    </Pressable>
                                    <Pressable onPress={() => setIsDeleteModalVisible(true)} style={styles.actionButton}>
@@ -504,19 +390,23 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                                    </Pressable>
                               </View>
                          </View>
-                         <Timer
-                              duration={workout.duration}
-                              isActive={isTimerActive}
-                              isPaused={isPaused}
-                              onComplete={handleComplete}
-                              prepTime={workout.prepTime}
-                              preStartTime={workout.preStartTime}
-                              cycleRestTime={workout.cycleRestTime}
-                              isCycleResting={isCycleResting}
-                              onCycleRestComplete={handleCycleRestComplete}
-                              workoutName={workout.name}
-                              isLastRepetition={workout.repeatCount !== 0 && repeatCount === workout.repeatCount - 1} // 마지막 횟수 여부
-                         />
+
+                         <View style={timerStyles.container}>
+                              <Text style={label}>{getLabelText()}</Text>
+                              <Text style={time}>{formatTime(displayTime)}</Text>
+                              <Progress.Bar
+                                   style={timerStyles.progressBar}
+                                   progress={progress}
+                                   width={Dimensions.get("window").width * 0.7}
+                                   height={8}
+                                   color={color}
+                                   unfilledColor="rgba(255, 255, 255, 0.2)"
+                                   borderWidth={0}
+                                   borderRadius={5}
+                                   animated={true}
+                              />
+                         </View>
+
                          <View style={styles.footer}>
                               <View>
                                    <Text style={styles.repeatText}>
@@ -526,7 +416,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                                         세트: {setCount}/{workout.cycleCount === 0 ? "∞" : workout.cycleCount}
                                    </Text>
                               </View>
-                              <Pressable onPress={handleResetPress} style={styles.resetButton}>
+                              <Pressable onPress={handleReset} style={styles.resetButton}>
                                    <MaterialIcons name="replay" size={24} color="#FFFFFF" />
                               </Pressable>
                          </View>
@@ -541,13 +431,12 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                               </View>
                          )}
                     </Pressable>
-
                     <View style={styles.musicControl}>
                          <View style={styles.switchContainer}>
                               <Text style={styles.musicLabel}>배경 음악</Text>
                               <Switch
                                    value={isMusicEnabled}
-                                   onValueChange={(value) => setIsMusicEnabled(value)}
+                                   onValueChange={setIsMusicEnabled}
                                    trackColor={{ false: "#767577", true: "#81b0ff" }}
                                    thumbColor={isMusicEnabled ? "#f5dd4b" : "#f4f3f4"}
                               />
@@ -592,7 +481,10 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                               <Text style={styles.modalTitle}>운동 삭제</Text>
                               <Text style={styles.modalMessage}>'{workout.name}' 운동을 삭제하시겠습니까?</Text>
                               <View style={styles.modalButtons}>
-                                   <Pressable style={styles.cancelButton} onPress={handleDeleteCancel}>
+                                   <Pressable
+                                        style={styles.cancelButton}
+                                        onPress={() => setIsDeleteModalVisible(false)}
+                                   >
                                         <Text style={styles.buttonText}>취소</Text>
                                    </Pressable>
                                    <Pressable style={styles.confirmButton} onPress={handleDeleteConfirm}>
@@ -662,68 +554,19 @@ const styles = StyleSheet.create({
           elevation: 5,
           width: "100%",
      },
-     pressableArea: {
-          flex: 1,
-     },
-     header: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-     },
-     title: {
-          fontSize: 22,
-          fontWeight: "bold",
-          color: "#FFFFFF",
-     },
-     actions: {
-          flexDirection: "row",
-          alignItems: "center",
-     },
-     actionButton: {
-          marginLeft: 16,
-          padding: 8,
-     },
-     statusIcon: {
-          marginLeft: 16,
-     },
-     footer: {
-          marginTop: 16,
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-     },
-     repeatText: {
-          fontSize: 18,
-          color: "#ffffff",
-          fontWeight: "500",
-     },
-     setText: {
-          fontSize: 18,
-          color: "#ffffff",
-          fontWeight: "500",
-          marginTop: 4,
-     },
-     resetButton: {
-          padding: 8,
-          backgroundColor: "rgba(255, 255, 255, 0.2)",
-          borderRadius: 20,
-     },
-     completedMessage: {
-          justifyContent: "center",
-          alignItems: "center",
-          marginTop: 20,
-     },
-     completedText: {
-          fontSize: 36,
-          fontWeight: "bold",
-          color: "#FFFFFF",
-          marginBottom: 16,
-     },
-     totalTimeText: {
-          fontSize: 16,
-          color: "#FFFFFF",
-     },
+     pressableArea: { flex: 1 },
+     header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+     title: { fontSize: 22, fontWeight: "bold", color: "#FFFFFF" },
+     actions: { flexDirection: "row", alignItems: "center" },
+     actionButton: { marginLeft: 16, padding: 8 },
+     statusIcon: { marginLeft: 16 },
+     footer: { marginTop: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+     repeatText: { fontSize: 18, color: "#ffffff", fontWeight: "500" },
+     setText: { fontSize: 18, color: "#ffffff", fontWeight: "500", marginTop: 4 },
+     resetButton: { padding: 8, backgroundColor: "rgba(255, 255, 255, 0.2)", borderRadius: 20 },
+     completedMessage: { justifyContent: "center", alignItems: "center", marginTop: 20 },
+     completedText: { fontSize: 36, fontWeight: "bold", color: "#FFFFFF", marginBottom: 16 },
+     totalTimeText: { fontSize: 16, color: "#FFFFFF" },
      musicControl: {
           marginTop: 16,
           padding: 10,
@@ -731,46 +574,14 @@ const styles = StyleSheet.create({
           borderRadius: 8,
           width: "100%",
      },
-     switchContainer: {
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-     },
-     musicLabel: {
-          fontSize: 16,
-          fontWeight: "600",
-          color: "#FFFFFF",
-     },
-     musicPickerContainer: {
-          flexDirection: "row",
-          alignItems: "center",
-          marginTop: 8,
-     },
-     musicPicker: {
-          flex: 1,
-          color: "#FFFFFF",
-          borderRadius: 8,
-          padding: 4,
-     },
-     infoButton: {
-          padding: 8,
-          marginLeft: 8,
-     },
-     volumeLabel: {
-          fontSize: 16,
-          color: "#FFFFFF",
-          marginTop: 8,
-     },
-     volumeSlider: {
-          width: "100%",
-          height: 40,
-     },
-     modalOverlay: {
-          flex: 1,
-          backgroundColor: "rgba(0, 0, 0, 0.7)",
-          justifyContent: "center",
-          alignItems: "center",
-     },
+     switchContainer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+     musicLabel: { fontSize: 16, fontWeight: "600", color: "#FFFFFF" },
+     musicPickerContainer: { flexDirection: "row", alignItems: "center", marginTop: 8 },
+     musicPicker: { flex: 1, color: "#FFFFFF", borderRadius: 8, padding: 4 },
+     infoButton: { padding: 8, marginLeft: 8 },
+     volumeLabel: { fontSize: 16, color: "#FFFFFF", marginTop: 8 },
+     volumeSlider: { width: "100%", height: 40 },
+     modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.7)", justifyContent: "center", alignItems: "center" },
      deleteModal: {
           backgroundColor: "#2C2C2C",
           borderRadius: 16,
@@ -795,41 +606,13 @@ const styles = StyleSheet.create({
           maxWidth: 400,
           maxHeight: "80%",
      },
-     modalTitle: {
-          fontSize: 20,
-          fontWeight: "bold",
-          color: "#FFFFFF",
-          marginBottom: 12,
-          textAlign: "center",
-     },
-     modalMessage: {
-          fontSize: 16,
-          color: "#BBBBBB",
-          textAlign: "center",
-          marginBottom: 20,
-     },
-     musicInfoContent: {
-          marginBottom: 20,
-     },
-     musicInfoItem: {
-          marginBottom: 16,
-     },
-     musicInfoTitle: {
-          fontSize: 16,
-          fontWeight: "600",
-          color: "#FFFFFF",
-          marginBottom: 4,
-     },
-     musicInfoText: {
-          fontSize: 14,
-          color: "#BBBBBB",
-          marginBottom: 2,
-     },
-     modalButtons: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          width: "100%",
-     },
+     modalTitle: { fontSize: 20, fontWeight: "bold", color: "#FFFFFF", marginBottom: 12, textAlign: "center" },
+     modalMessage: { fontSize: 16, color: "#BBBBBB", textAlign: "center", marginBottom: 20 },
+     musicInfoContent: { marginBottom: 20 },
+     musicInfoItem: { marginBottom: 16 },
+     musicInfoTitle: { fontSize: 16, fontWeight: "600", color: "#FFFFFF", marginBottom: 4 },
+     musicInfoText: { fontSize: 14, color: "#BBBBBB", marginBottom: 2 },
+     modalButtons: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
      cancelButton: {
           flex: 1,
           backgroundColor: "#555",
@@ -846,15 +629,19 @@ const styles = StyleSheet.create({
           alignItems: "center",
           marginLeft: 8,
      },
-     closeButton: {
-          backgroundColor: "#555",
-          padding: 12,
-          borderRadius: 8,
-          alignItems: "center",
-     },
-     buttonText: {
-          fontSize: 16,
-          color: "#FFFFFF",
-          fontWeight: "600",
-     },
+     closeButton: { backgroundColor: "#555", padding: 12, borderRadius: 8, alignItems: "center" },
+     buttonText: { fontSize: 16, color: "#FFFFFF", fontWeight: "600" },
+});
+
+const timerStyles = StyleSheet.create({
+     container: { alignItems: "center" },
+     label: { fontSize: 18, color: "#ffffff", fontWeight: "bold", marginBottom: 8 },
+     labelPreStart: { fontSize: 18, color: "#FFD700", fontWeight: "bold", marginBottom: 8 },
+     labelRest: { fontSize: 18, color: "#00FF00", fontWeight: "bold", marginBottom: 8 },
+     labelCycleRest: { fontSize: 18, color: "#FF69B4", fontWeight: "bold", marginBottom: 8 },
+     time: { fontSize: 48, fontWeight: "bold", color: "#FFFFFF" },
+     timePreStart: { fontSize: 48, fontWeight: "bold", color: "#FFD700" },
+     timeRest: { fontSize: 48, fontWeight: "bold", color: "#00FF00" },
+     timeCycleRest: { fontSize: 48, fontWeight: "bold", color: "#FF69B4" },
+     progressBar: { marginTop: 20 },
 });

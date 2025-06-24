@@ -10,7 +10,6 @@
           "orientation": "portrait",
           "icon": "./src/assets/icon.png",
           "userInterfaceStyle": "light",
-          "newArchEnabled": true,
           "assetBundlePatterns": ["**/*"],
           "splash": {
                "image": "./src/assets/splash-icon.png",
@@ -18,7 +17,10 @@
                "backgroundColor": "#F1F0EC"
           },
           "ios": {
-               "supportsTablet": true
+               "supportsTablet": true,
+               "infoPlist": {
+                    "UIBackgroundModes": ["audio"]
+               }
           },
           "android": {
                "adaptiveIcon": {
