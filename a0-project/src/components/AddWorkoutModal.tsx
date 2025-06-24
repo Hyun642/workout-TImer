@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
      modalContainer: { backgroundColor: "#1E1E1E", borderRadius: 24, padding: 24, width: "90%", maxHeight: "90%" },
      modalTitle: { fontSize: 24, fontWeight: "bold", color: "#FFFFFF", marginBottom: 24, textAlign: "center" },
      inputSection: { marginBottom: 24 },
-     label: { fontSize: 16, color: "#BBBBBB", marginBottom: 8 },
+     label: { fontSize: 16, color: "#ffffff", marginBottom: 8 },
      textInput: {
           backgroundColor: "#3C3C3C",
           color: "#FFFFFF",

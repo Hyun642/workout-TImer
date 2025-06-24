@@ -1,5 +1,3 @@
-// src/components/NumberInputStepper.tsx
-
 import React, { useRef } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -24,6 +22,7 @@ export default function NumberInputStepper({
      unit = "초",
 }: NumberInputStepperProps) {
      const intervalRef = useRef<NodeJS.Timeout | null>(null);
+     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
      const handleIncrement = () => {
           onValueChange(Math.min(max, value + step));
@@ -34,8 +33,8 @@ export default function NumberInputStepper({
      };
 
      const handlePressIn = (action: "increment" | "decrement") => {
-          // 0.5초 후에 연속 변경 시작
-          intervalRef.current = setTimeout(() => {
+          // 길게 누를 때 0.5초 후에 연속 변경 시작
+          longPressTimerRef.current = setTimeout(() => {
                intervalRef.current = setInterval(() => {
                     if (action === "increment") handleIncrement();
                     else handleDecrement();
@@ -44,11 +43,8 @@ export default function NumberInputStepper({
      };
 
      const handlePressOut = () => {
-          if (intervalRef.current) {
-               clearTimeout(intervalRef.current);
-               clearInterval(intervalRef.current);
-               intervalRef.current = null;
-          }
+          if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+          if (intervalRef.current) clearInterval(intervalRef.current);
      };
 
      return (
@@ -60,6 +56,7 @@ export default function NumberInputStepper({
                          onPressIn={() => handlePressIn("decrement")}
                          onPressOut={handlePressOut}
                          style={styles.button}
+                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                          <MaterialIcons name="remove" size={24} color="#E0E0E0" />
                     </Pressable>
@@ -79,6 +76,7 @@ export default function NumberInputStepper({
                          onPressIn={() => handlePressIn("increment")}
                          onPressOut={handlePressOut}
                          style={styles.button}
+                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                          <MaterialIcons name="add" size={24} color="#E0E0E0" />
                     </Pressable>
@@ -93,7 +91,7 @@ const styles = StyleSheet.create({
      },
      label: {
           fontSize: 16,
-          color: "#BBBBBB",
+          color: "#ffffff",
           marginBottom: 8,
      },
      controlsContainer: {
@@ -110,7 +108,7 @@ const styles = StyleSheet.create({
      },
      valueContainer: {
           flexDirection: "row",
-          alignItems: "baseline",
+          alignItems: "center",
           justifyContent: "center",
           flex: 1,
      },
