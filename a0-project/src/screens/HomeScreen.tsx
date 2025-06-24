@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, Modal, Animated } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Workout } from "../types/workout";
@@ -28,16 +28,49 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
      const [isStatsModalVisible, setIsStatsModalVisible] = useState(false);
      const [workoutToEdit, setWorkoutToEdit] = useState<Workout | null>(null);
 
+     const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+     const [workoutToDelete, setWorkoutToDelete] = useState<Workout | null>(null);
+
+     const [isResetModalVisible, setIsResetModalVisible] = useState(false);
+     const workoutToResetRef = useRef<(() => void) | null>(null);
+
+     const [deleteModalScale] = useState(new Animated.Value(0));
+     const [resetModalScale] = useState(new Animated.Value(0));
+
      useEffect(() => {
           loadWorkouts();
      }, []);
 
+     useEffect(() => {
+          if (isDeleteModalVisible) {
+               Animated.spring(deleteModalScale, {
+                    toValue: 1,
+                    friction: 8,
+                    tension: 40,
+                    useNativeDriver: true,
+               }).start();
+          } else {
+               Animated.timing(deleteModalScale, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+          }
+     }, [isDeleteModalVisible]);
+
+     useEffect(() => {
+          if (isResetModalVisible) {
+               Animated.spring(resetModalScale, {
+                    toValue: 1,
+                    friction: 8,
+                    tension: 40,
+                    useNativeDriver: true,
+               }).start();
+          } else {
+               Animated.timing(resetModalScale, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+          }
+     }, [isResetModalVisible]);
+
      const loadWorkouts = async () => {
           try {
                const storedWorkouts = await AsyncStorage.getItem("workouts");
-               if (storedWorkouts) {
-                    setWorkouts(JSON.parse(storedWorkouts));
-               }
+               if (storedWorkouts) setWorkouts(JSON.parse(storedWorkouts));
           } catch (error) {
                logger.error("Error loading workouts:", error);
           }
@@ -56,18 +89,39 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           if (workoutToEdit) {
                const updatedWorkouts = workouts.map((w) => (w.id === newWorkout.id ? newWorkout : w));
                saveWorkouts(updatedWorkouts);
-               setWorkoutToEdit(null);
           } else {
                const workoutWithId = { ...newWorkout, id: uuidv4() };
-               const updatedWorkouts = [workoutWithId, ...workouts];
-               saveWorkouts(updatedWorkouts);
+               saveWorkouts([workoutWithId, ...workouts]);
           }
           setIsAddModalVisible(false);
+          setWorkoutToEdit(null);
      };
 
-     const handleDeleteWorkout = (id: string) => {
-          const updatedWorkouts = workouts.filter((w) => w.id !== id);
-          saveWorkouts(updatedWorkouts);
+     const handleDeleteRequest = (workout: Workout) => {
+          setWorkoutToDelete(workout);
+          setIsDeleteModalVisible(true);
+     };
+
+     const handleDeleteConfirm = () => {
+          if (workoutToDelete) {
+               const updatedWorkouts = workouts.filter((w) => w.id !== workoutToDelete.id);
+               saveWorkouts(updatedWorkouts);
+          }
+          setIsDeleteModalVisible(false);
+          setWorkoutToDelete(null);
+     };
+
+     const handleResetRequest = (resetFunction: () => void) => {
+          workoutToResetRef.current = resetFunction;
+          setIsResetModalVisible(true);
+     };
+
+     const handleResetConfirm = () => {
+          if (workoutToResetRef.current) {
+               workoutToResetRef.current();
+          }
+          setIsResetModalVisible(false);
+          workoutToResetRef.current = null;
      };
 
      const handleEditWorkout = (workout: Workout) => {
@@ -75,9 +129,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           setIsAddModalVisible(true);
      };
 
-     const handleHistoryUpdate = () => {
-          // 통계 데이터 갱신을 위해 필요 시 로직 추가
-     };
+     const handleHistoryUpdate = () => {};
 
      return (
           <View style={styles.container}>
@@ -106,9 +158,10 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                          <WorkoutCard
                               key={workout.id}
                               workout={workout}
-                              onDelete={handleDeleteWorkout}
-                              onEdit={handleEditWorkout}
+                              onDeleteRequest={() => handleDeleteRequest(workout)}
+                              onEdit={() => handleEditWorkout(workout)}
                               onHistoryUpdate={handleHistoryUpdate}
+                              onResetRequest={(resetFunc) => handleResetRequest(resetFunc)}
                          />
                     ))}
                     <View style={styles.emptyContainer}>
@@ -137,16 +190,54 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                />
 
                <StatisticsModal visible={isStatsModalVisible} onClose={() => setIsStatsModalVisible(false)} />
+
+               <Modal visible={isDeleteModalVisible} transparent={true} animationType="none">
+                    <View style={modalStyles.modalOverlay}>
+                         <Animated.View style={[modalStyles.modal, { transform: [{ scale: deleteModalScale }] }]}>
+                              <Text style={modalStyles.modalTitle}>운동 삭제</Text>
+                              <Text style={modalStyles.modalMessage}>
+                                   '{workoutToDelete?.name}' 운동을 삭제하시겠습니까?
+                              </Text>
+                              <View style={modalStyles.modalButtons}>
+                                   <Pressable
+                                        style={modalStyles.cancelButton}
+                                        onPress={() => setIsDeleteModalVisible(false)}
+                                   >
+                                        <Text style={modalStyles.buttonText}>취소</Text>
+                                   </Pressable>
+                                   <Pressable style={modalStyles.confirmButton} onPress={handleDeleteConfirm}>
+                                        <Text style={modalStyles.buttonText}>확인</Text>
+                                   </Pressable>
+                              </View>
+                         </Animated.View>
+                    </View>
+               </Modal>
+
+               <Modal visible={isResetModalVisible} transparent={true} animationType="none">
+                    <View style={modalStyles.modalOverlay}>
+                         <Animated.View style={[modalStyles.modal, { transform: [{ scale: resetModalScale }] }]}>
+                              <Text style={modalStyles.modalTitle}>처음으로</Text>
+                              <Text style={modalStyles.modalMessage}>진행 상황이 초기화됩니다.</Text>
+                              <View style={modalStyles.modalButtons}>
+                                   <Pressable
+                                        style={modalStyles.cancelButton}
+                                        onPress={() => setIsResetModalVisible(false)}
+                                   >
+                                        <Text style={modalStyles.buttonText}>취소</Text>
+                                   </Pressable>
+                                   <Pressable style={modalStyles.confirmButton} onPress={handleResetConfirm}>
+                                        <Text style={modalStyles.buttonText}>확인</Text>
+                                   </Pressable>
+                              </View>
+                         </Animated.View>
+                    </View>
+               </Modal>
           </View>
      );
 }
 
 const styles = StyleSheet.create({
-     container: {
-          flex: 1,
-          backgroundColor: "#1C1C1C",
-          paddingTop: 10,
-     },
+     container: { flex: 1, backgroundColor: "#1C1C1C", paddingTop: 10 },
      header: {
           flexDirection: "row",
           justifyContent: "space-between",
@@ -154,25 +245,11 @@ const styles = StyleSheet.create({
           paddingHorizontal: 20,
           paddingBottom: 16,
      },
-     title: {
-          fontSize: 28,
-          fontWeight: "bold",
-          color: "#fcfcfc",
-     },
-     headerActions: {
-          flexDirection: "row",
-     },
-     historyButton: {
-          padding: 8,
-          marginRight: 8,
-     },
-     statsButton: {
-          padding: 8,
-          marginRight: 8,
-     },
-     addButton: {
-          padding: 8,
-     },
+     title: { fontSize: 28, fontWeight: "bold", color: "#fcfcfc" },
+     headerActions: { flexDirection: "row" },
+     historyButton: { padding: 8, marginRight: 8 },
+     statsButton: { padding: 8, marginRight: 8 },
+     addButton: { padding: 8 },
      scrollContainer: {
           paddingHorizontal: 20,
           paddingBottom: 20,
@@ -180,29 +257,51 @@ const styles = StyleSheet.create({
           justifyContent: "center",
           alignItems: "center",
      },
-     emptyContainer: {
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          marginTop: 40,
-     },
+     emptyContainer: { display: "flex", justifyContent: "center", alignItems: "center", marginTop: 40 },
      largeAddButton: {
           width: 110,
           height: 65,
-          // borderRadius: 40,
           backgroundColor: "#1c1c1c",
           justifyContent: "center",
           alignItems: "center",
           marginBottom: 5,
-          elevation: 5, // Android 그림자 효과
-          shadowColor: "#000", // iOS 그림자 효과
+          elevation: 5,
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.3,
           shadowRadius: 4,
      },
-     emptyText: {
-          fontSize: 18,
-          color: "#ffffff",
-          textAlign: "center",
+     emptyText: { fontSize: 18, color: "#ffffff", textAlign: "center" },
+});
+
+const modalStyles = StyleSheet.create({
+     modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.7)", justifyContent: "center", alignItems: "center" },
+     modal: {
+          backgroundColor: "#2C2C2C",
+          borderRadius: 16,
+          padding: 20,
+          width: "80%",
+          maxWidth: 350,
+          alignItems: "center",
      },
+     modalTitle: { fontSize: 20, fontWeight: "bold", color: "#FFFFFF", marginBottom: 12, textAlign: "center" },
+     modalMessage: { fontSize: 16, color: "#BBBBBB", textAlign: "center", marginBottom: 20 },
+     modalButtons: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
+     cancelButton: {
+          flex: 1,
+          backgroundColor: "#555",
+          padding: 12,
+          borderRadius: 8,
+          alignItems: "center",
+          marginRight: 8,
+     },
+     confirmButton: {
+          flex: 1,
+          backgroundColor: "#FF4444",
+          padding: 12,
+          borderRadius: 8,
+          alignItems: "center",
+          marginLeft: 8,
+     },
+     buttonText: { fontSize: 16, color: "#FFFFFF", fontWeight: "600" },
 });

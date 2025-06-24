@@ -1,9 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet, Pressable, Modal, Animated } from "react-native";
-import { Picker } from "@react-native-picker/picker";
+import {
+     View,
+     Text,
+     TextInput,
+     StyleSheet,
+     Pressable,
+     Modal,
+     Animated,
+     ScrollView,
+     KeyboardAvoidingView,
+     Platform,
+} from "react-native";
 import { Workout } from "../types/workout";
+import NumberInputStepper from "./NumberInputStepper";
 import { v4 as uuidv4 } from "uuid";
-import logger from "../utils/logger";
 
 interface AddWorkoutModalProps {
      visible: boolean;
@@ -13,71 +23,60 @@ interface AddWorkoutModalProps {
 }
 
 export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit }: AddWorkoutModalProps) {
-     const [selectedCategory, setSelectedCategory] = useState<string>("푸쉬업");
      const [name, setName] = useState<string>("");
-     const [duration, setDuration] = useState<string>("5");
-     const [repeatCount, setRepeatCount] = useState<string>("12");
-     const [cycleCount, setCycleCount] = useState<string>("4");
-     const [prepTime, setPrepTime] = useState<string>("2");
-     const [preStartTime, setPreStartTime] = useState<string>("5");
-     const [cycleRestTime, setCycleRestTime] = useState<string>("60");
+     const [duration, setDuration] = useState<number>(5);
+     const [repeatCount, setRepeatCount] = useState<number>(12);
+     const [cycleCount, setCycleCount] = useState<number>(4);
+     const [prepTime, setPrepTime] = useState<number>(2);
+     const [preStartTime, setPreStartTime] = useState<number>(5);
+     const [cycleRestTime, setCycleRestTime] = useState<number>(60);
      const [backgroundColor, setBackgroundColor] = useState<string>("#4CAF50");
      const [modalScale] = useState(new Animated.Value(0));
 
+     // [핵심 수정 1] 모달 애니메이션은 'visible' 상태에만 반응하도록 분리
      useEffect(() => {
           if (visible) {
-               if (workoutToEdit) {
-                    setSelectedCategory(workoutToEdit.name as string);
-                    setName(workoutToEdit.name);
-                    setDuration(workoutToEdit.duration.toString());
-                    setRepeatCount(workoutToEdit.repeatCount.toString());
-                    setCycleCount(workoutToEdit.cycleCount.toString());
-                    setPrepTime(workoutToEdit.prepTime.toString());
-                    setPreStartTime(workoutToEdit.preStartTime.toString());
-                    setCycleRestTime(workoutToEdit.cycleRestTime.toString());
-                    setBackgroundColor(workoutToEdit.backgroundColor);
-               } else {
-                    setSelectedCategory("푸쉬업");
-                    setName("푸쉬업");
-                    setDuration("4");
-                    setRepeatCount("12");
-                    setCycleCount("3");
-                    setPrepTime("2");
-                    setPreStartTime("5");
-                    setCycleRestTime("60");
-                    setBackgroundColor("#4CAF50");
-               }
-               Animated.spring(modalScale, {
-                    toValue: 1,
-                    friction: 8,
-                    tension: 40,
-                    useNativeDriver: true,
-               }).start();
+               Animated.spring(modalScale, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }).start();
           } else {
-               Animated.timing(modalScale, {
-                    toValue: 0,
-                    duration: 200,
-                    useNativeDriver: true,
-               }).start();
+               Animated.timing(modalScale, { toValue: 0, duration: 200, useNativeDriver: true }).start();
           }
-     }, [visible, workoutToEdit]);
+     }, [visible]);
 
+     // [핵심 수정 2] 데이터 설정은 'workoutToEdit' 상태에만 반응하도록 분리
      useEffect(() => {
-          if (selectedCategory !== "그 외") {
-               setName(selectedCategory);
+          if (workoutToEdit) {
+               // 수정 모드: 기존 데이터로 폼 채우기
+               setName(workoutToEdit.name);
+               setDuration(workoutToEdit.duration);
+               setRepeatCount(workoutToEdit.repeatCount);
+               setCycleCount(workoutToEdit.cycleCount);
+               setPrepTime(workoutToEdit.prepTime);
+               setPreStartTime(workoutToEdit.preStartTime);
+               setCycleRestTime(workoutToEdit.cycleRestTime);
+               setBackgroundColor(workoutToEdit.backgroundColor);
+          } else {
+               // 추가 모드: 기본값으로 폼 리셋
+               setName("새 운동"); // 기본 이름 제공
+               setDuration(30);
+               setRepeatCount(12);
+               setCycleCount(4);
+               setPrepTime(10);
+               setPreStartTime(5);
+               setCycleRestTime(60);
+               setBackgroundColor("#4CAF50");
           }
-     }, [selectedCategory]);
+     }, [workoutToEdit]);
 
      const handleAdd = () => {
           const newWorkout: Workout = {
                id: workoutToEdit ? workoutToEdit.id : uuidv4(),
                name: name || "새 루틴",
-               duration: parseInt(duration) || 30,
-               repeatCount: parseInt(repeatCount) || 0,
-               cycleCount: parseInt(cycleCount) || 0,
-               prepTime: parseInt(prepTime) || 0,
-               preStartTime: parseInt(preStartTime) || 5,
-               cycleRestTime: parseInt(cycleRestTime) || 0,
+               duration,
+               repeatCount,
+               cycleCount,
+               prepTime,
+               preStartTime,
+               cycleRestTime,
                backgroundColor,
           };
           onAdd(newWorkout);
@@ -86,276 +85,140 @@ export default function AddWorkoutModal({ visible, onClose, onAdd, workoutToEdit
 
      return (
           <Modal visible={visible} transparent={true} animationType="none">
-               <View style={styles.modalOverlay}>
+               <KeyboardAvoidingView
+                    behavior={Platform.OS === "ios" ? "padding" : "height"}
+                    style={styles.modalOverlay}
+               >
                     <Animated.View style={[styles.modalContainer, { transform: [{ scale: modalScale }] }]}>
-                         <Text style={styles.modalTitle}>{workoutToEdit ? "운동 수정" : "운동 추가"}</Text>
-                         <View style={styles.inputContainer}>
-                              <Text style={styles.label}>운동 종류</Text>
-                              <Picker
-                                   selectedValue={selectedCategory}
-                                   onValueChange={(itemValue: string) => setSelectedCategory(itemValue)}
-                                   style={styles.picker}
-                              >
-                                   <Picker.Item label="푸쉬업" value="푸쉬업" />
-                                   <Picker.Item label="스쿼트" value="스쿼트" />
-                                   <Picker.Item label="풀업" value="풀업" />
-                                   <Picker.Item label="윗몸일으키기" value="윗몸일으키기" />
-                                   <Picker.Item label="플랭크" value="플랭크" />
-                                   <Picker.Item label="인터벌" value="인터벌" />
-                                   <Picker.Item label="타바타" value="타바타" />
-                                   <Picker.Item label="스트레칭" value="스트레칭" />
-                                   <Picker.Item label="공부" value="공부" />
-                                   <Picker.Item label="그 외" value="그 외" />
-                              </Picker>
-                         </View>
-
-                         {selectedCategory === "그 외" && (
-                              <View style={styles.inputContainer}>
+                         <Text style={styles.modalTitle}>{workoutToEdit ? "운동 수정" : "새로운 운동"}</Text>
+                         <ScrollView showsVerticalScrollIndicator={false}>
+                              <View style={styles.inputSection}>
                                    <Text style={styles.label}>운동 이름</Text>
                                    <TextInput
-                                        style={styles.input}
+                                        style={styles.textInput}
                                         value={name}
                                         onChangeText={setName}
-                                        placeholder="운동 이름을 입력하세요"
-                                        placeholderTextColor="#888"
-                                        maxLength={13}
-                                   />
-                              </View>
-                         )}
-
-                         <View style={styles.inputContainer}>
-                              <Text style={styles.label}>{name || "새 루틴"}</Text>
-                              <View style={styles.inputWrapper}>
-                                   <Text style={styles.unit}>회 당 </Text>
-                                   <TextInput
-                                        style={styles.input}
-                                        value={duration}
-                                        onChangeText={setDuration}
-                                        keyboardType="numeric"
-                                        placeholder="30"
+                                        placeholder="예: 푸쉬업, 스쿼트"
                                         placeholderTextColor="#888"
                                    />
-                                   <Text style={styles.unit}> 초</Text>
                               </View>
-                         </View>
-
-                         <View style={styles.inputContainer}>
-                              <Text style={styles.label}>횟수</Text>
-                              <View style={styles.inputWrapper}>
-                                   <Text style={styles.unit}>한 세트 </Text>
-                                   <TextInput
-                                        style={styles.input}
-                                        value={repeatCount}
-                                        onChangeText={setRepeatCount}
-                                        keyboardType="numeric"
-                                        placeholder="12"
-                                        placeholderTextColor="#888"
-                                   />
-                                   <Text style={styles.unit}> 회</Text>
+                              <NumberInputStepper
+                                   label="운동 시간 (1회 당)"
+                                   value={duration}
+                                   onValueChange={setDuration}
+                                   unit="초"
+                              />
+                              <NumberInputStepper
+                                   label="휴식 시간 (1회 당)"
+                                   value={prepTime}
+                                   onValueChange={setPrepTime}
+                                   unit="초"
+                              />
+                              <NumberInputStepper
+                                   label="반복 횟수 (1세트 당)"
+                                   value={repeatCount}
+                                   onValueChange={setRepeatCount}
+                                   unit="회"
+                              />
+                              <NumberInputStepper
+                                   label="총 세트 수"
+                                   value={cycleCount}
+                                   onValueChange={setCycleCount}
+                                   unit="세트"
+                              />
+                              <NumberInputStepper
+                                   label="세트 간 휴식"
+                                   value={cycleRestTime}
+                                   onValueChange={setCycleRestTime}
+                                   unit="초"
+                              />
+                              <NumberInputStepper
+                                   label="시작 전 준비 시간"
+                                   value={preStartTime}
+                                   onValueChange={setPreStartTime}
+                                   unit="초"
+                              />
+                              <View style={styles.inputSection}>
+                                   <Text style={styles.label}>카드 색상</Text>
+                                   <View style={styles.colorPicker}>
+                                        <Pressable
+                                             style={[
+                                                  styles.colorButton,
+                                                  { backgroundColor: "#4CAF50" },
+                                                  backgroundColor === "#4CAF50" && styles.selectedColor,
+                                             ]}
+                                             onPress={() => setBackgroundColor("#4CAF50")}
+                                        />
+                                        <Pressable
+                                             style={[
+                                                  styles.colorButton,
+                                                  { backgroundColor: "#2196F3" },
+                                                  backgroundColor === "#2196F3" && styles.selectedColor,
+                                             ]}
+                                             onPress={() => setBackgroundColor("#2196F3")}
+                                        />
+                                        <Pressable
+                                             style={[
+                                                  styles.colorButton,
+                                                  { backgroundColor: "#FF9800" },
+                                                  backgroundColor === "#FF9800" && styles.selectedColor,
+                                             ]}
+                                             onPress={() => setBackgroundColor("#FF9800")}
+                                        />
+                                        <Pressable
+                                             style={[
+                                                  styles.colorButton,
+                                                  { backgroundColor: "#9C27B0" },
+                                                  backgroundColor === "#9C27B0" && styles.selectedColor,
+                                             ]}
+                                             onPress={() => setBackgroundColor("#9C27B0")}
+                                        />
+                                        <Pressable
+                                             style={[
+                                                  styles.colorButton,
+                                                  { backgroundColor: "#E91E63" },
+                                                  backgroundColor === "#E91E63" && styles.selectedColor,
+                                             ]}
+                                             onPress={() => setBackgroundColor("#E91E63")}
+                                        />
+                                   </View>
                               </View>
-                         </View>
-
-                         <View style={styles.inputContainer}>
-                              <Text style={styles.label}>세트</Text>
-                              <View style={styles.inputWrapper}>
-                                   <Text style={styles.unit}>총 </Text>
-                                   <TextInput
-                                        style={styles.input}
-                                        value={cycleCount}
-                                        onChangeText={setCycleCount}
-                                        keyboardType="numeric"
-                                        placeholder="1"
-                                        placeholderTextColor="#888"
-                                   />
-                                   <Text style={styles.unit}> 세트</Text>
-                              </View>
-                         </View>
-
-                         <View style={styles.inputContainer}>
-                              <Text style={styles.label}>1회 당 휴식 시간</Text>
-                              <View style={styles.inputWrapper}>
-                                   <Text style={styles.unit}>회 당 </Text>
-                                   <TextInput
-                                        style={styles.input}
-                                        value={prepTime}
-                                        onChangeText={setPrepTime}
-                                        keyboardType="numeric"
-                                        placeholder="0"
-                                        placeholderTextColor="#888"
-                                   />
-                                   <Text style={styles.unit}> 초</Text>
-                              </View>
-                         </View>
-
-                         <View style={styles.inputContainer}>
-                              <Text style={styles.label}>시작 전 준비 시간</Text>
-                              <View style={styles.inputWrapper}>
-                                   <Text style={styles.unit}>시작 전 </Text>
-                                   <TextInput
-                                        style={styles.input}
-                                        value={preStartTime}
-                                        onChangeText={setPreStartTime}
-                                        keyboardType="numeric"
-                                        placeholder="5"
-                                        placeholderTextColor="#888"
-                                   />
-                                   <Text style={styles.unit}> 초</Text>
-                              </View>
-                         </View>
-
-                         <View style={styles.inputContainer}>
-                              <Text style={styles.label}>세트 간 휴식 시간</Text>
-                              <View style={styles.inputWrapper}>
-                                   <Text style={styles.unit}>세트 간 </Text>
-                                   <TextInput
-                                        style={styles.input}
-                                        value={cycleRestTime}
-                                        onChangeText={setCycleRestTime}
-                                        keyboardType="numeric"
-                                        placeholder="60"
-                                        placeholderTextColor="#888"
-                                   />
-                                   <Text style={styles.unit}> 초</Text>
-                              </View>
-                         </View>
-
-                         <View style={styles.inputContainer}>
-                              <Text style={styles.label}>배경 색상</Text>
-                              <View style={styles.colorPicker}>
-                                   <Pressable
-                                        style={[
-                                             styles.colorButton,
-                                             { backgroundColor: "#4CAF50" },
-                                             backgroundColor === "#4CAF50" && styles.selectedColor,
-                                        ]}
-                                        onPress={() => setBackgroundColor("#4CAF50")}
-                                   />
-                                   <Pressable
-                                        style={[
-                                             styles.colorButton,
-                                             { backgroundColor: "#ad71f8" },
-                                             backgroundColor === "#ad71f8" && styles.selectedColor,
-                                        ]}
-                                        onPress={() => setBackgroundColor("#ad71f8")}
-                                   />
-                                   <Pressable
-                                        style={[
-                                             styles.colorButton,
-                                             { backgroundColor: "#0049f0" },
-                                             backgroundColor === "#0049f0" && styles.selectedColor,
-                                        ]}
-                                        onPress={() => setBackgroundColor("#0049f0")}
-                                   />
-                              </View>
-                         </View>
-
+                         </ScrollView>
                          <View style={styles.buttonContainer}>
-                              <Pressable style={styles.cancelButton} onPress={onClose}>
-                                   <Text style={styles.buttonText}>취소</Text>
+                              <Pressable style={[styles.actionButton, styles.cancelButton]} onPress={onClose}>
+                                   <Text style={[styles.buttonText, styles.cancelButtonText]}>취소</Text>
                               </Pressable>
-                              <Pressable style={styles.addButton} onPress={handleAdd}>
-                                   <Text style={styles.buttonText}>{workoutToEdit ? "수정" : "추가"}</Text>
+                              <Pressable style={[styles.actionButton, styles.addButton]} onPress={handleAdd}>
+                                   <Text style={styles.buttonText}>{workoutToEdit ? "수정하기" : "추가하기"}</Text>
                               </Pressable>
                          </View>
                     </Animated.View>
-               </View>
+               </KeyboardAvoidingView>
           </Modal>
      );
 }
 
 const styles = StyleSheet.create({
-     modalOverlay: {
-          flex: 1,
-          backgroundColor: "rgba(0, 0, 0, 0.7)",
-          justifyContent: "center",
-          alignItems: "center",
-     },
-     modalContainer: {
-          backgroundColor: "#2C2C2C",
-          borderRadius: 16,
-          padding: 20,
-          width: "90%",
-          maxWidth: 400,
-     },
-     modalTitle: {
-          fontSize: 20,
-          fontWeight: "bold",
-          color: "#FFFFFF",
-          marginBottom: 20,
-          textAlign: "center",
-     },
-     inputContainer: {
-          flexDirection: "row",
-          alignItems: "center",
-          marginBottom: 16,
-     },
-     label: {
-          fontSize: 16,
-          color: "#FFFFFF",
-          flex: 1,
-     },
-     inputWrapper: {
-          flexDirection: "row",
-          alignItems: "center",
-     },
-     input: {
+     modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.7)", justifyContent: "center", alignItems: "center" },
+     modalContainer: { backgroundColor: "#1E1E1E", borderRadius: 24, padding: 24, width: "90%", maxHeight: "90%" },
+     modalTitle: { fontSize: 24, fontWeight: "bold", color: "#FFFFFF", marginBottom: 24, textAlign: "center" },
+     inputSection: { marginBottom: 24 },
+     label: { fontSize: 16, color: "#BBBBBB", marginBottom: 8 },
+     textInput: {
           backgroundColor: "#3C3C3C",
           color: "#FFFFFF",
-          borderRadius: 8,
-          padding: 8,
-          width: 80,
-          textAlign: "center",
-     },
-     picker: {
-          flex: 1,
-          color: "#FFFFFF",
-          backgroundColor: "#3C3C3C",
-          borderRadius: 8,
-     },
-     unit: {
-          fontSize: 16,
-          color: "#BBBBBB",
-          marginHorizontal: 4,
-     },
-     colorPicker: {
-          flexDirection: "row",
-          justifyContent: "flex-end",
-          width: 120,
-     },
-     colorButton: {
-          width: 30,
-          height: 30,
-          borderRadius: 15,
-          marginHorizontal: 5,
-     },
-     selectedColor: {
-          borderWidth: 2,
-          borderColor: "#FFFFFF",
-     },
-     buttonContainer: {
-          flexDirection: "row",
-          justifyContent: "space-between",
-          marginTop: 20,
-     },
-     cancelButton: {
-          flex: 1,
-          backgroundColor: "#555",
+          borderRadius: 12,
           padding: 12,
-          borderRadius: 8,
-          alignItems: "center",
-          marginRight: 8,
-     },
-     addButton: {
-          flex: 1,
-          backgroundColor: "#4CAF50",
-          padding: 12,
-          borderRadius: 8,
-          alignItems: "center",
-          marginLeft: 8,
-     },
-     buttonText: {
           fontSize: 16,
-          color: "#FFFFFF",
-          fontWeight: "600",
+          height: 50,
      },
+     colorPicker: { flexDirection: "row", justifyContent: "space-around", paddingTop: 10 },
+     colorButton: { width: 40, height: 40, borderRadius: 20 },
+     selectedColor: { borderWidth: 3, borderColor: "#FFFFFF", transform: [{ scale: 1.1 }] },
+     buttonContainer: { flexDirection: "row", justifyContent: "space-between", marginTop: 24, gap: 16 },
+     actionButton: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: "center" },
+     cancelButton: { backgroundColor: "#3C3C3C" },
+     addButton: { backgroundColor: "#4CAF50" },
+     buttonText: { fontSize: 16, color: "#FFFFFF", fontWeight: "bold" },
+     cancelButtonText: { color: "#E0E0E0" },
 });

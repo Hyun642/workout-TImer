@@ -15,9 +15,10 @@ import { useSettings } from "../contexts/SettingsContext";
 
 interface WorkoutCardProps {
      workout: Workout;
-     onDelete: (id: string) => void;
-     onEdit: (workout: Workout) => void;
+     onDeleteRequest: () => void;
+     onEdit: () => void;
      onHistoryUpdate: () => void;
+     onResetRequest: (resetFunc: () => void) => void;
 }
 
 const saveWorkoutHistory = async (historyItem: WorkoutHistory, onHistoryUpdate: () => void) => {
@@ -35,7 +36,13 @@ const saveWorkoutHistory = async (historyItem: WorkoutHistory, onHistoryUpdate: 
 type MusicTrackKey = "music1" | "music2" | "music3";
 type TimerMode = "preStart" | "workout" | "prep" | "cycleRest";
 
-export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate }: WorkoutCardProps) {
+export default function WorkoutCard({
+     workout,
+     onDeleteRequest,
+     onEdit,
+     onHistoryUpdate,
+     onResetRequest,
+}: WorkoutCardProps) {
      const [isTimerActive, setIsTimerActive] = useState(false);
      const [isPaused, setIsPaused] = useState(false);
      const [isCompleted, setIsCompleted] = useState(false);
@@ -57,8 +64,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
      const [isMusicEnabled, setIsMusicEnabled] = useState(false);
      const [isMusicLoading, setIsMusicLoading] = useState(false);
      const [selectedTrack, setSelectedTrack] = useState<MusicTrackKey>("music1");
-     const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
-     const [isResetModalVisible, setIsResetModalVisible] = useState(false);
+
      const [isMusicInfoModalVisible, setIsMusicInfoModalVisible] = useState(false);
      const [modalScale] = useState(new Animated.Value(0));
      const [volume, setVolume] = useState(0.2);
@@ -158,12 +164,11 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
           if (isTimerActive) {
                if (displayTime <= 3 && displayTime > 0) {
                     if (timerMode !== "preStart") {
-                         soundsRef.current.endingSound?.replayAsync();
+                         if (displayTime <= 3) soundsRef.current.endingSound?.replayAsync();
                     } else if (displayTime === 3) {
                          soundsRef.current.countSound?.replayAsync();
                     }
                } else if (displayTime <= 0) {
-                    // [핵심 수정] 0초가 되는 순간, 사운드를 먼저 재생하고 상태 전환
                     playCompletionSoundAndSwitchState();
                }
           }
@@ -181,7 +186,6 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
           } else if (timerMode === "prep" || timerMode === "cycleRest") {
                soundsRef.current.restEndSound?.replayAsync();
           }
-          // 사운드 재생 후, 상태 전환
           handleTimerCompletion();
      };
 
@@ -198,7 +202,22 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                     return;
                }
                setRepeatCount(newReps);
-               nextMode = isLastRep ? "cycleRest" : "prep";
+               if (isLastRep) {
+                    if (workout.cycleRestTime > 0) {
+                         nextMode = "cycleRest";
+                    } else {
+                         setSetCount((prev) => prev + 1);
+                         setRepeatCount(0);
+                         soundsRef.current.restEndSound?.replayAsync();
+                         nextMode = "workout";
+                    }
+               } else {
+                    if (workout.prepTime > 0) {
+                         nextMode = "prep";
+                    } else {
+                         nextMode = "workout";
+                    }
+               }
           } else if (timerMode === "prep" || timerMode === "cycleRest") {
                if (timerMode === "cycleRest") {
                     setSetCount((prev) => prev + 1);
@@ -206,15 +225,8 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                }
                nextMode = "workout";
           }
-
-          if (getDurationForMode(nextMode) > 0) {
-               setTimerMode(nextMode);
-               setDisplayTime(getDurationForMode(nextMode));
-          } else {
-               // 0초짜리 휴식은 건너뛰기
-               setTimerMode("workout");
-               setDisplayTime(getDurationForMode("workout"));
-          }
+          setTimerMode(nextMode);
+          setDisplayTime(getDurationForMode(nextMode));
      };
 
      const handlePress = () => {
@@ -331,21 +343,12 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                setNotificationId(null);
           }
      };
-     const handleDeleteConfirm = async () => {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          setIsTimerActive(false);
-          dismissNotification();
-          if (backgroundMusic) {
-               await backgroundMusic.stopAsync();
-               await backgroundMusic.unloadAsync();
-          }
-          onDelete(workout.id);
-          setIsDeleteModalVisible(false);
-     };
 
-     const { label, time, color } = getDynamicStyles();
-     const totalDuration = getDurationForMode(timerMode);
-     const progress = totalDuration > 0 ? (totalDuration - displayTime) / totalDuration : 0;
+     useEffect(() => {
+          if (isMusicInfoModalVisible)
+               Animated.spring(modalScale, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }).start();
+          else Animated.timing(modalScale, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+     }, [isMusicInfoModalVisible]);
 
      return (
           <>
@@ -382,24 +385,29 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                                              style={styles.statusIcon}
                                         />
                                    ) : null}
-                                   <Pressable onPress={() => onEdit(workout)} style={styles.actionButton}>
+                                   <Pressable onPress={onEdit} style={styles.actionButton}>
                                         <MaterialCommunityIcons name="pencil" size={24} color="#ffffff" />
                                    </Pressable>
-                                   <Pressable onPress={() => setIsDeleteModalVisible(true)} style={styles.actionButton}>
+                                   <Pressable onPress={onDeleteRequest} style={styles.actionButton}>
                                         <MaterialCommunityIcons name="delete" size={24} color="#ffffff" />
                                    </Pressable>
                               </View>
                          </View>
 
                          <View style={timerStyles.container}>
-                              <Text style={label}>{getLabelText()}</Text>
-                              <Text style={time}>{formatTime(displayTime)}</Text>
+                              <Text style={getDynamicStyles().label}>{getLabelText()}</Text>
+                              <Text style={getDynamicStyles().time}>{formatTime(displayTime)}</Text>
                               <Progress.Bar
                                    style={timerStyles.progressBar}
-                                   progress={progress}
+                                   progress={
+                                        getDurationForMode(timerMode) > 0
+                                             ? (getDurationForMode(timerMode) - displayTime) /
+                                               getDurationForMode(timerMode)
+                                             : 0
+                                   }
                                    width={Dimensions.get("window").width * 0.7}
                                    height={8}
-                                   color={color}
+                                   color={getDynamicStyles().color}
                                    unfilledColor="rgba(255, 255, 255, 0.2)"
                                    borderWidth={0}
                                    borderRadius={5}
@@ -416,7 +424,7 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                                         세트: {setCount}/{workout.cycleCount === 0 ? "∞" : workout.cycleCount}
                                    </Text>
                               </View>
-                              <Pressable onPress={handleReset} style={styles.resetButton}>
+                              <Pressable onPress={() => onResetRequest(handleReset)} style={styles.resetButton}>
                                    <MaterialIcons name="replay" size={24} color="#FFFFFF" />
                               </Pressable>
                          </View>
@@ -475,52 +483,9 @@ export default function WorkoutCard({ workout, onDelete, onEdit, onHistoryUpdate
                     </View>
                </View>
 
-               <Modal visible={isDeleteModalVisible} transparent={true} animationType="none">
-                    <View style={styles.modalOverlay}>
-                         <Animated.View style={[styles.deleteModal, { transform: [{ scale: modalScale }] }]}>
-                              <Text style={styles.modalTitle}>운동 삭제</Text>
-                              <Text style={styles.modalMessage}>'{workout.name}' 운동을 삭제하시겠습니까?</Text>
-                              <View style={styles.modalButtons}>
-                                   <Pressable
-                                        style={styles.cancelButton}
-                                        onPress={() => setIsDeleteModalVisible(false)}
-                                   >
-                                        <Text style={styles.buttonText}>취소</Text>
-                                   </Pressable>
-                                   <Pressable style={styles.confirmButton} onPress={handleDeleteConfirm}>
-                                        <Text style={styles.buttonText}>확인</Text>
-                                   </Pressable>
-                              </View>
-                         </Animated.View>
-                    </View>
-               </Modal>
-
-               <Modal visible={isResetModalVisible} transparent={true} animationType="none">
-                    <View style={styles.modalOverlay}>
-                         <Animated.View style={[styles.resetModal, { transform: [{ scale: modalScale }] }]}>
-                              <Text style={styles.modalTitle}>처음으로</Text>
-                              <Text style={styles.modalMessage}>진행 상황이 초기화됩니다.</Text>
-                              <View style={styles.modalButtons}>
-                                   <Pressable style={styles.cancelButton} onPress={() => setIsResetModalVisible(false)}>
-                                        <Text style={styles.buttonText}>취소</Text>
-                                   </Pressable>
-                                   <Pressable
-                                        style={styles.confirmButton}
-                                        onPress={() => {
-                                             setIsResetModalVisible(false);
-                                             handleReset();
-                                        }}
-                                   >
-                                        <Text style={styles.buttonText}>확인</Text>
-                                   </Pressable>
-                              </View>
-                         </Animated.View>
-                    </View>
-               </Modal>
-
                <Modal visible={isMusicInfoModalVisible} transparent={true} animationType="none">
                     <View style={styles.modalOverlay}>
-                         <Animated.View style={[styles.musicInfoModal, { transform: [{ scale: modalScale }] }]}>
+                         <Animated.View style={[styles.modal, { transform: [{ scale: modalScale }] }]}>
                               <Text style={styles.modalTitle}>음악 출처</Text>
                               <ScrollView style={styles.musicInfoContent}>
                                    {Object.entries(musicInfo).map(([track, info]) => (
@@ -582,29 +547,13 @@ const styles = StyleSheet.create({
      volumeLabel: { fontSize: 16, color: "#FFFFFF", marginTop: 8 },
      volumeSlider: { width: "100%", height: 40 },
      modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.7)", justifyContent: "center", alignItems: "center" },
-     deleteModal: {
+     modal: {
           backgroundColor: "#2C2C2C",
           borderRadius: 16,
           padding: 20,
           width: "80%",
           maxWidth: 350,
           alignItems: "center",
-     },
-     resetModal: {
-          backgroundColor: "#2C2C2C",
-          borderRadius: 16,
-          padding: 20,
-          width: "80%",
-          maxWidth: 350,
-          alignItems: "center",
-     },
-     musicInfoModal: {
-          backgroundColor: "#2C2C2C",
-          borderRadius: 16,
-          padding: 20,
-          width: "90%",
-          maxWidth: 400,
-          maxHeight: "80%",
      },
      modalTitle: { fontSize: 20, fontWeight: "bold", color: "#FFFFFF", marginBottom: 12, textAlign: "center" },
      modalMessage: { fontSize: 16, color: "#BBBBBB", textAlign: "center", marginBottom: 20 },
