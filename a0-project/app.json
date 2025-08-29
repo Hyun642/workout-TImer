@@ -40,13 +40,25 @@
           "newArchEnabled": true,
           "plugins": [
                [
+                    "expo-build-properties",
+                    {
+                         "android": {
+                              "compileSdkVersion": 35,
+                              "targetSdkVersion": 35,
+                              "buildToolsVersion": "35.0.0"
+                         },
+                         "ios": {
+                              "deploymentTarget": "15.1"
+                         }
+                    }
+               ],
+               [
                     "expo-notifications",
                     {
                          "icon": "./src/assets/favicon.png",
                          "color": "#ffffff"
                     }
-               ],
-               "expo-build-properties"
+               ]
           ]
      }
 }
