@@ -1,4 +1,4 @@
-# 🕒 홈트 타이머 (Homet-Timer)
+# 🕒 홈트 타이머
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/946f23ff-d2d8-4fe1-b8bd-356fd365a4bf" width="160" height="160" alt="Homet-Timer Logo">
