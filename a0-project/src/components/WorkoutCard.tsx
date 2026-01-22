@@ -95,6 +95,74 @@ export default function WorkoutCard({
      };
 
      useEffect(() => {
+          let soundObject: Audio.Sound | null = null;
+
+          const loadMusic = async () => {
+               if (isMusicEnabled) {
+                    setIsMusicLoading(true);
+                    try {
+                         const { sound } = await Audio.Sound.createAsync(
+                              musicTracks[selectedTrack],
+                              { isLooping: true, volume: volume, shouldPlay: false }
+                         );
+                         soundObject = sound;
+                         setBackgroundMusic(sound);
+                    } catch (error) {
+                         logger.error("Failed to load background music", error);
+                         setIsMusicEnabled(false);
+                    } finally {
+                         setIsMusicLoading(false);
+                    }
+               }
+          };
+
+          if (isMusicEnabled) {
+               loadMusic();
+          } else {
+               setBackgroundMusic(null);
+          }
+
+          return () => {
+               if (soundObject) {
+                    soundObject.unloadAsync();
+               }
+          };
+     }, [isMusicEnabled, selectedTrack]);
+
+     useEffect(() => {
+          const controlPlayback = async () => {
+               if (backgroundMusic) {
+                    if (isTimerActive && !isPaused) {
+                         try {
+                              const status = await backgroundMusic.getStatusAsync();
+                              if (status.isLoaded && !status.isPlaying) {
+                                   await backgroundMusic.playAsync();
+                              }
+                         } catch (error) {
+                              logger.error("Error playing music", error);
+                         }
+                    } else {
+                         try {
+                              const status = await backgroundMusic.getStatusAsync();
+                              if (status.isLoaded && status.isPlaying) {
+                                   await backgroundMusic.pauseAsync();
+                              }
+                         } catch (error) {
+                              logger.error("Error pausing music", error);
+                         }
+                    }
+               }
+          };
+          controlPlayback();
+     }, [isTimerActive, isPaused, backgroundMusic]);
+
+     useEffect(() => {
+          if (backgroundMusic) {
+               backgroundMusic.setVolumeAsync(volume);
+          }
+     }, [volume, backgroundMusic]);
+
+     useEffect(() => {
           const initialize = async () => {
                await Audio.setAudioModeAsync({
                     allowsRecordingIOS: false,
