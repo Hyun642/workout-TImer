@@ -7,6 +7,11 @@ import { useSettings } from "../contexts/SettingsContext"; // [추가]
 
 export default function SettingsScreen() {
      const { soundEffectsVolume, setSoundEffectsVolume } = useSettings(); // [추가]
+     const [localVolume, setLocalVolume] = useState(soundEffectsVolume);
+
+     useEffect(() => {
+          setLocalVolume(soundEffectsVolume);
+     }, [soundEffectsVolume]);
 
      const openLink = async (url: string) => {
           // ... (기존과 동일)
@@ -19,15 +24,15 @@ export default function SettingsScreen() {
                     <Text style={styles.sectionTitle}>사운드 설정</Text>
                     <View style={styles.item}>
                          <Text style={styles.itemTitle}>효과음 볼륨</Text>
-                         <Text style={styles.itemDescription}>{Math.round(soundEffectsVolume * 100)}%</Text>
+                         <Text style={styles.itemDescription}>{Math.round(localVolume * 100)}%</Text>
                     </View>
                     <Slider
                          style={{ width: "100%", height: 40, marginBottom: 10 }}
                          minimumValue={0}
                          maximumValue={1}
-                         step={0.05}
-                         value={soundEffectsVolume}
-                         onValueChange={setSoundEffectsVolume}
+                         value={localVolume}
+                         onValueChange={setLocalVolume}
+                         onSlidingComplete={setSoundEffectsVolume}
                          minimumTrackTintColor="#FFFFFF"
                          maximumTrackTintColor="#555555"
                          thumbTintColor="#FFFFFF"

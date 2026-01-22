@@ -31,14 +31,22 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
           loadVolume();
      }, []);
 
-     const setSoundEffectsVolume = async (volume: number) => {
+     // 볼륨 변경 시 AsyncStorage에 저장 (디바운싱 적용)
+     useEffect(() => {
+          const saveVolume = async () => {
+               try {
+                    await AsyncStorage.setItem(SOUND_EFFECTS_VOLUME_KEY, JSON.stringify(soundEffectsVolume));
+               } catch (error) {
+                    logger.error("Failed to save sound effects volume.", error);
+               }
+          };
+
+          const timeoutId = setTimeout(saveVolume, 500); // 0.5초 대기
+          return () => clearTimeout(timeoutId);
+     }, [soundEffectsVolume]);
+
+     const setSoundEffectsVolume = (volume: number) => {
           setSoundEffectsVolumeState(volume);
-          try {
-               // 볼륨 변경 시 AsyncStorage에 저장
-               await AsyncStorage.setItem(SOUND_EFFECTS_VOLUME_KEY, JSON.stringify(volume));
-          } catch (error) {
-               logger.error("Failed to save sound effects volume.", error);
-          }
      };
 
      return (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Pressable, Switch, Modal, Animated, ScrollView, Dimensions } from "react-native";
+import { View, Text, StyleSheet, Pressable, Switch, Modal, Animated, ScrollView, Dimensions, Linking } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import Slider from "@react-native-community/slider";
 import { Picker } from "@react-native-picker/picker";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -12,6 +13,8 @@ import { Audio } from "expo-av";
 import logger from "../utils/logger";
 import * as Notifications from "expo-notifications";
 import { useSettings } from "../contexts/SettingsContext";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface WorkoutCardProps {
      workout: Workout;
@@ -94,6 +97,50 @@ export default function WorkoutCard({
           },
      };
 
+     const [localVolume, setLocalVolume] = useState(volume);
+     
+     const volumeAnims = useRef([...Array(7)].map(() => new Animated.Value(0))).current;
+
+     useEffect(() => {
+          const animations = volumeAnims.map((anim, index) => {
+               return Animated.loop(
+                    Animated.sequence([
+                         Animated.timing(anim, {
+                              toValue: 1,
+                              duration: 800,
+                              delay: index * 120,
+                              useNativeDriver: false,
+                         }),
+                         Animated.timing(anim, {
+                              toValue: 0,
+                              duration: 800,
+                              useNativeDriver: false,
+                         }),
+                    ])
+               );
+          });
+
+          Animated.parallel(animations).start();
+     }, []);
+
+     const trackKeys: MusicTrackKey[] = ["music1", "music2", "music3"];
+
+     const prevTrack = () => {
+          const currentIndex = trackKeys.indexOf(selectedTrack);
+          const prevIndex = (currentIndex - 1 + trackKeys.length) % trackKeys.length;
+          setSelectedTrack(trackKeys[prevIndex]);
+     };
+
+     const nextTrack = () => {
+          const currentIndex = trackKeys.indexOf(selectedTrack);
+          const nextIndex = (currentIndex + 1) % trackKeys.length;
+          setSelectedTrack(trackKeys[nextIndex]);
+     };
+
+     const toggleMusic = () => {
+          setIsMusicEnabled((prev) => !prev);
+     };
+
      useEffect(() => {
           let soundObject: Audio.Sound | null = null;
 
@@ -161,6 +208,9 @@ export default function WorkoutCard({
                backgroundMusic.setVolumeAsync(volume);
           }
      }, [volume, backgroundMusic]);
+     
+     // localVolume 초기 동기화는 useState 초기값으로 처리하거나 여기서 할 수 있음
+     // 하지만 사용자가 외부에서 볼륨을 바꿀 일은 없으므로 초기화만 잘하면 됨.
 
      useEffect(() => {
           const initialize = async () => {
@@ -508,45 +558,98 @@ export default function WorkoutCard({
                          )}
                     </Pressable>
                     <View style={styles.musicControl}>
-                         <View style={styles.switchContainer}>
-                              <Text style={styles.musicLabel}>배경 음악</Text>
-                              <Switch
-                                   value={isMusicEnabled}
-                                   onValueChange={setIsMusicEnabled}
-                                   trackColor={{ false: "#767577", true: "#81b0ff" }}
-                                   thumbColor={isMusicEnabled ? "#f5dd4b" : "#f4f3f4"}
-                              />
+                         <View style={styles.musicHeader}>
+                              <View style={styles.musicHeaderLeft}>
+                                   <MaterialIcons name="music-note" size={24} color={isMusicEnabled ? "#4CAF50" : "#888"} />
+                                   <Text style={[styles.musicLabel, { color: isMusicEnabled ? "#FFFFFF" : "#888" }]}>
+                                        {isMusicEnabled ? "배경 음악 켜짐" : "배경 음악 꺼짐"}
+                                   </Text>
+                              </View>
+                              <Pressable onPress={toggleMusic} hitSlop={10}>
+                                   <MaterialCommunityIcons
+                                        name={isMusicEnabled ? "toggle-switch" : "toggle-switch-off"}
+                                        size={40}
+                                        color={isMusicEnabled ? "#4CAF50" : "#555"}
+                                   />
+                              </Pressable>
                          </View>
+
                          {isMusicEnabled && (
-                              <>
-                                   <View style={styles.musicPickerContainer}>
-                                        <Picker
-                                             selectedValue={selectedTrack}
-                                             onValueChange={(itemValue: MusicTrackKey) => setSelectedTrack(itemValue)}
-                                             style={styles.musicPicker}
-                                             enabled={isMusicEnabled}
-                                        >
-                                             <Picker.Item label="Music 1" value="music1" />
-                                             <Picker.Item label="Music 2" value="music2" />
-                                             <Picker.Item label="Music 3" value="music3" />
-                                        </Picker>
-                                        <Pressable
-                                             style={styles.infoButton}
+                              <View style={styles.musicBody}>
+                                   {/* Track Control */}
+                                   <View style={styles.trackControl}>
+                                        <Pressable onPress={prevTrack} style={styles.trackButton}>
+                                             <MaterialIcons name="skip-previous" size={32} color="#FFFFFF" />
+                                        </Pressable>
+                                        
+                                        <Pressable 
+                                             style={styles.trackInfoContainer} 
                                              onPress={() => setIsMusicInfoModalVisible(true)}
                                         >
-                                             <MaterialIcons name="info-outline" size={22} color="lightgray" />
+                                             <Text style={styles.trackTitle} numberOfLines={1}>
+                                                  {musicInfo[selectedTrack].title}
+                                             </Text>
+                                             <Text style={styles.trackSubtitle}>터치하여 정보 보기</Text>
+                                        </Pressable>
+
+                                        <Pressable onPress={nextTrack} style={styles.trackButton}>
+                                             <MaterialIcons name="skip-next" size={32} color="#FFFFFF" />
                                         </Pressable>
                                    </View>
-                                   <Text style={styles.volumeLabel}>볼륨: {Math.round(volume * 100)}%</Text>
-                                   <Slider
-                                        style={styles.volumeSlider}
-                                        minimumValue={0}
-                                        maximumValue={100}
-                                        step={5}
-                                        value={volume * 100}
-                                        onValueChange={(value) => setVolume(value / 100)}
-                                   />
-                              </>
+
+                                   {/* Volume Control */}
+                                   <View style={styles.volumeControl}>
+                                        <Pressable onPress={() => setVolume(0)} hitSlop={10}>
+                                             <MaterialIcons name={volume === 0 ? "volume-off" : "volume-mute"} size={24} color="#AAAAAA" />
+                                        </Pressable>
+                                        
+                                        <View style={styles.volumeSegmentsContainer}>
+                                             {volumeAnims.map((anim, index) => {
+                                                  const level = index + 1;
+                                                  const maxLevel = 7;
+                                                  const targetVolume = level / maxLevel;
+                                                  const isActive = volume >= targetVolume - 0.05;
+
+                                                  const animatedHeight = anim.interpolate({
+                                                       inputRange: [0, 1],
+                                                       outputRange: ["40%", "90%"],
+                                                  });
+
+                                                  return (
+                                                       <Pressable
+                                                            key={level}
+                                                            style={styles.volumeSegmentBox}
+                                                            onPress={() => setVolume(targetVolume)}
+                                                       >
+                                                            <Animated.View
+                                                                 style={[
+                                                                      styles.volumeInnerBar,
+                                                                      {
+                                                                           height: isActive ? animatedHeight : 4,
+                                                                           width: isActive ? "60%" : "60%",
+                                                                           backgroundColor: isActive ? "transparent" : "rgba(255, 255, 255, 0.2)",
+                                                                      },
+                                                                 ]}
+                                                            >
+                                                                 {isActive && (
+                                                                      <LinearGradient
+                                                                           colors={["#B9F6CA", "#00E676"]}
+                                                                           style={{ flex: 1, borderRadius: 2 }}
+                                                                           start={{ x: 0, y: 0 }}
+                                                                           end={{ x: 0, y: 1 }}
+                                                                      />
+                                                                 )}
+                                                            </Animated.View>
+                                                       </Pressable>
+                                                  );
+                                             })}
+                                        </View>
+
+                                        <Pressable onPress={() => setVolume(1)} hitSlop={10}>
+                                             <MaterialIcons name="volume-up" size={24} color="#AAAAAA" />
+                                        </Pressable>
+                                   </View>
+                              </View>
                          )}
                     </View>
                </View>
@@ -602,18 +705,87 @@ const styles = StyleSheet.create({
      totalTimeText: { fontSize: 16, color: "#FFFFFF" },
      musicControl: {
           marginTop: 16,
-          padding: 10,
-          backgroundColor: "rgba(255, 255, 255, 0.1)",
-          borderRadius: 8,
+          padding: 16,
+          backgroundColor: "rgba(0, 0, 0, 0.3)",
+          borderRadius: 20,
           width: "100%",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.05)",
      },
-     switchContainer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-     musicLabel: { fontSize: 16, fontWeight: "600", color: "#FFFFFF" },
-     musicPickerContainer: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-     musicPicker: { flex: 1, color: "#FFFFFF", borderRadius: 8, padding: 4 },
-     infoButton: { padding: 8, marginLeft: 8 },
-     volumeLabel: { fontSize: 16, color: "#FFFFFF", marginTop: 8 },
-     volumeSlider: { width: "100%", height: 40 },
+     musicHeader: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+     },
+     musicHeaderLeft: {
+          flexDirection: "row",
+          alignItems: "center",
+     },
+     musicLabel: {
+          fontSize: 16,
+          fontWeight: "600",
+          marginLeft: 10,
+     },
+     musicBody: {
+          marginTop: 16,
+     },
+     trackControl: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 16,
+          backgroundColor: "rgba(255,255,255,0.05)",
+          borderRadius: 16,
+          paddingVertical: 8,
+          paddingHorizontal: 8,
+     },
+     trackButton: {
+          padding: 8,
+          backgroundColor: "rgba(255,255,255,0.1)",
+          borderRadius: 20,
+     },
+     trackInfoContainer: {
+          flex: 1,
+          alignItems: "center",
+          marginHorizontal: 12,
+     },
+     trackTitle: {
+          fontSize: 15,
+          fontWeight: "bold",
+          color: "#FFFFFF",
+          textAlign: "center",
+          marginBottom: 2,
+     },
+     trackSubtitle: {
+          fontSize: 11,
+          color: "#AAAAAA",
+     },
+     volumeControl: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 8,
+          marginTop: 8,
+     },
+     volumeSegmentsContainer: {
+          flex: 1,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          marginHorizontal: 12,
+          alignItems: "center",
+     },
+     volumeSegmentBox: {
+          width: 28,
+          height: 28,
+          justifyContent: "flex-end",
+          alignItems: "center",
+          backgroundColor: "rgba(255, 255, 255, 0.05)",
+          borderRadius: 6,
+          paddingBottom: 4,
+     },
+     volumeInnerBar: {
+          borderRadius: 2,
+     },
      modalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.7)", justifyContent: "center", alignItems: "center" },
      modal: {
           backgroundColor: "#2C2C2C",
